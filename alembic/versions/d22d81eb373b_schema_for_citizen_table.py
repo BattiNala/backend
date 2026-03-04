@@ -1,8 +1,8 @@
-"""add user role relationship
+"""schema for citizen table
 
-Revision ID: 455730de26af
-Revises: a57f023b08ec
-Create Date: 2026-03-04 16:34:40.413912
+Revision ID: d22d81eb373b
+Revises: dd04e013db37
+Create Date: 2026-03-04 17:48:54.371168
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '455730de26af'
-down_revision: Union[str, Sequence[str], None] = 'a57f023b08ec'
+revision: str = 'd22d81eb373b'
+down_revision: Union[str, Sequence[str], None] = 'dd04e013db37'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
