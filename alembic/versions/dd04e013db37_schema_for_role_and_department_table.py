@@ -1,8 +1,8 @@
-"""create base tables
+"""schema for role and department table
 
-Revision ID: 74bd7b77f51b
+Revision ID: dd04e013db37
 Revises: 
-Create Date: 2026-03-01 16:42:32.402060
+Create Date: 2026-03-04 17:34:14.345603
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '74bd7b77f51b'
+revision: str = 'dd04e013db37'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
