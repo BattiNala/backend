@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
@@ -11,6 +12,8 @@ class User(Base):
     role_id = Column(Integer, nullable=False)
     status = Column(bool, nullable=False, default=True)
     is_verified = Column(bool, nullable=False, default=False)
+
+    role = relationship("Role", back_populates="users", foreign_keys=[role_id])
 
     def __repr__(self):
         return f"<User(user_id={self.user_id}, username='{self.username}', role_id={self.role_id}, status={self.status}, is_verified={self.is_verified})>"
