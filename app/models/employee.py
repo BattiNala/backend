@@ -1,13 +1,8 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum as sql_enum
 from sqlalchemy.orm import relationship
-from enum import Enum
 from app.db.base import Base
 
-
-class ActivityStatus(str, Enum):
-    BUSY = "busy"
-    AVAILABLE = "available"
-    OFF_DUTY = "off_duty"
+from app.schemas.employee import EmployeeActivityStatus as ActivityStatus
 
 
 class Employee(Base):
@@ -36,11 +31,15 @@ class Employee(Base):
         nullable=False,
         default=ActivityStatus.AVAILABLE,
     )
-
+    teams = relationship(
+        "Team",
+        back_populates="members",
+        cascade="all, delete",
+    )
     user = relationship("User", back_populates="employee_profile", uselist=False)
 
-    assigned_issues = relationship(
-        "Issue",
-        back_populates="assignee",
-        foreign_keys="Issue.assignee_id",
-    )
+    # assigned_issues = relationship(
+    #     "Issue",
+    #     back_populates="assignee",
+    #     foreign_keys="Issue.assignee_id",
+    # )
