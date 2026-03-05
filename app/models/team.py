@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
@@ -12,7 +12,7 @@ class Team(Base):
     # availibility status of the team based on the availability of its members
     # if all members are busy, then the team is considered busy. If at least one member is available,
     # the team is considered available.
-    status = Column(bool, nullable=False, default=True)
+    status = Column(Boolean, nullable=False, default=True)
     deapartment_id = Column(
         Integer,
         ForeignKey("departments.department_id", ondelete="CASCADE"),
@@ -23,12 +23,12 @@ class Team(Base):
     base_longitude = Column(String(50), nullable=False)
     coverage_radius_km = Column(Integer, nullable=False)
 
-    # members = relationship(
-    #     "Employee",
-    #     secondary="team_members",
-    #     back_populates="teams",
-    #     cascade="all, delete",
-    # )
+    members = relationship(
+        "Employee",
+        back_populates="teams",
+        cascade="all, delete",
+    )
+
     department = relationship(
         "Department", back_populates="teams", foreign_keys=[deapartment_id]
     )
