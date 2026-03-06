@@ -1,3 +1,5 @@
+# pylint: disable=missing-module-docstring
+
 from datetime import datetime
 
 import pytest

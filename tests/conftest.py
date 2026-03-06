@@ -1,3 +1,5 @@
+# pylint: disable=missing-module-docstring
+
 import os
 import sys
 from pathlib import Path
