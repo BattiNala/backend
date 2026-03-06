@@ -1,3 +1,5 @@
+"""Database engine, session factory, and request-scoped DB dependency."""
+
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -8,11 +10,16 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import settings
 
 
-engine = create_async_engine(
-    f"postgresql+asyncpg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}",
-    pool_pre_ping=True,
+DATABASE_URL = (
+    "postgresql+asyncpg://"
+    f"{settings.DB_USER}:{settings.DB_PASSWORD}"
+    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
 )
 
+engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
+
+# SQLAlchemy convention commonly uses this name for async session factory.
+# pylint: disable=invalid-name
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     autoflush=False,
@@ -22,5 +29,6 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Yield an async database session for a request lifecycle."""
     async with AsyncSessionLocal() as session:
         yield session

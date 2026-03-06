@@ -1,3 +1,5 @@
+"""Authentication and request-scoped dependencies for API v1."""
+
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +17,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ):
+    """Resolve and return the authenticated user from a bearer token."""
     credentials_exception = CredentialException()
     token = credentials.credentials
 
@@ -23,8 +26,8 @@ async def get_current_user(
         user_id: int = payload.get("user_id")
         if user_id is None:
             raise credentials_exception
-    except jwt.PyJWTError:
-        raise credentials_exception
+    except jwt.PyJWTError as exc:
+        raise credentials_exception from exc
     user = await UserRepository(db).get_user_by_id(user_id)
     if user is None:
         raise credentials_exception

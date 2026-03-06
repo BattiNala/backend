@@ -1,3 +1,5 @@
+"""Main API v1 router registration."""
+
 from fastapi import APIRouter
 from app.api.v1.endpoints import issues, routes, auth, superadmin
 

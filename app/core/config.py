@@ -1,7 +1,11 @@
+"""Application settings loaded from environment and defaults."""
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Typed runtime configuration for the application."""
+
     APP_NAME: str = "BattiNala Backend"
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
