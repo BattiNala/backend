@@ -27,5 +27,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "pylint>=4.0.5",
     "pytest>=9.0.2",
 ]
