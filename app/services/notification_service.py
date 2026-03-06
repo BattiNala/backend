@@ -1,3 +1,5 @@
+"""Notification service abstractions and delivery implementations."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -12,7 +14,9 @@ from app.repositories.user_repo import UserRepository
 from app.schemas.otp import OtpChannel
 
 
-class NotificationRecipient:
+class NotificationRecipient:  # pylint: disable=too-few-public-methods
+    """Recipient details used by concrete notification senders."""
+
     def __init__(
         self,
         user_id: int,
@@ -26,15 +30,21 @@ class NotificationRecipient:
         self.phone_number = phone_number
 
 
-class BaseNotificationSender(ABC):
+class BaseNotificationSender(ABC):  # pylint: disable=too-few-public-methods
+    """Abstract sender interface for notification channels."""
+
     @abstractmethod
     async def send(
         self, recipient: NotificationRecipient, subject: str, body: str
     ) -> None:
-        pass
+        """Deliver a message to a recipient via a specific channel."""
 
 
-class EmailSender(BaseNotificationSender):
+class EmailSender(BaseNotificationSender):  # pylint: disable=too-few-public-methods
+    """SMTP-backed notification sender."""
+
+    # Explicit SMTP options keep sender configuration at construction time.
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
         smtp_host: str = "localhost",
@@ -56,6 +66,7 @@ class EmailSender(BaseNotificationSender):
     async def send(
         self, recipient: NotificationRecipient, subject: str, body: str
     ) -> None:
+        """Send an email notification to the recipient."""
         if not recipient.email:
             print(f"User {recipient.username} has no email. Email not sent.")
             return
@@ -79,10 +90,13 @@ class EmailSender(BaseNotificationSender):
         print(f"Email sent to {recipient.email}: Subject: {subject}")
 
 
-class SMSSender(BaseNotificationSender):
+class SMSSender(BaseNotificationSender):  # pylint: disable=too-few-public-methods
+    """SMS sender placeholder implementation."""
+
     async def send(
         self, recipient: NotificationRecipient, subject: str, body: str
     ) -> None:
+        """Send an SMS notification to the recipient."""
         if not recipient.phone_number:
             print(f"User {recipient.username} has no phone number. SMS not sent.")
             return
@@ -91,6 +105,10 @@ class SMSSender(BaseNotificationSender):
 
 
 class NotificationService:
+    """Application service for routing notifications to users and roles."""
+
+    # Constructor wiring is intentionally explicit for dependency injection.
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
         user_repo: UserRepository,
@@ -103,11 +121,12 @@ class NotificationService:
         self.role_repo = role_repo
         self.citizen_repo = citizen_repo
         self.senders: dict[OtpChannel, BaseNotificationSender] = {
-            OtpChannel.email: email_sender,
-            OtpChannel.sms: sms_sender,
+            OtpChannel.EMAIL: email_sender,
+            OtpChannel.SMS: sms_sender,
         }
 
     async def _get_recipient(self, user_id: int) -> Optional[NotificationRecipient]:
+        """Fetch user details and return a NotificationRecipient object."""
         user = await self.user_repo.get_user_by_id(user_id)
         if not user:
             return None
@@ -128,6 +147,7 @@ class NotificationService:
         subject: str,
         body: str,
     ) -> None:
+        """Send a notification to a specific user via the specified channel."""
         recipient = await self._get_recipient(user_id)
         if not recipient:
             print(f"User with ID {user_id} not found. Notification not sent.")
@@ -142,17 +162,20 @@ class NotificationService:
         subject: str,
         body: str,
     ) -> None:
+        """
+        Send a notification to a specific user, automatically choosing the best channel.
+        Priority: Email > SMS"""
         recipient = await self._get_recipient(user_id)
         if not recipient:
             print(f"User with ID {user_id} not found. Notification not sent.")
             return
 
         if recipient.email:
-            await self.senders[OtpChannel.email].send(recipient, subject, body)
+            await self.senders[OtpChannel.EMAIL].send(recipient, subject, body)
             return
 
         if recipient.phone_number:
-            await self.senders[OtpChannel.sms].send(recipient, subject, body)
+            await self.senders[OtpChannel.SMS].send(recipient, subject, body)
             return
 
         print(
@@ -166,6 +189,10 @@ class NotificationService:
         subject: str,
         body: str,
     ) -> None:
+        """
+        Send a notification to all users with a specific role via the specified channel.
+        UNDER DEVELOPMENT: This method is not fully implemented yet.
+        """
         role = await self.role_repo.get_role_by_name(role_name)
         if not role:
             print(f"Role '{role_name}' not found. Notification not sent.")
