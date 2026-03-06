@@ -1,5 +1,9 @@
+"""
+Haversine formula for calculating great circle distances.
+"""
+
 import math
-from schemas.geo_location import GeoLocation
+from app.schemas.geo_location import GeoLocation
 
 
 def haversine(loc1: GeoLocation, loc2: GeoLocation) -> float:

@@ -1,3 +1,7 @@
+"""
+date and time related utilities.
+"""
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
