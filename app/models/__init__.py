@@ -5,3 +5,4 @@ from .roles import Role
 from .user import User
 from .team import Team
 from .employee import Employee
+from .otp_code import OtpCode
