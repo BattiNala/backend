@@ -16,10 +16,11 @@ jobs:
       uses: astral-sh/setup-uv@v7
       with:
           python-version: ${{ matrix.python-version }}
+          enable-cache: true
     - name: Install requirements
       run: uv sync --locked --all-extras --dev
     
 
     - name: Analysing the code with pylint
       run: |
-        uv run pylint --ignore=alembic $(git ls-files '*.py')
+        uv run pylint $(git ls-files '*.py' | grep -v '^alembic/')
