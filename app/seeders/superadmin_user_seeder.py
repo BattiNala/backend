@@ -11,6 +11,7 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 async def seed_superadmin_user(db: AsyncSession):
+    """Seed the database with a superadmin user if it doesn't already exist."""
     await seed_superadmin_role(db)
     superadmin_role = await RoleRepository(db).get_role_by_name("superadmin")
     superadmin_role_id = superadmin_role.role_id if superadmin_role else None

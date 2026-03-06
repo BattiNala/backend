@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from enum import Enum
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class EmployeeActivityStatus(str, Enum):
