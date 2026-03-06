@@ -1,4 +1,3 @@
-# role realted schemas
 from pydantic import BaseModel
 
 

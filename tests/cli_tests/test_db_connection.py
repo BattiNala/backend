@@ -13,6 +13,7 @@ DB_NAME = os.getenv("DB_NAME")
 
 
 async def test_asyncpg_connection():
+    """Test that we can establish a connection to the database using asyncpg."""
     conn = await asyncpg.connect(
         host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
     )
