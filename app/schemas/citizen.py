@@ -1,10 +1,14 @@
-# schemas for citizen related data models
+"""
+Schemas for citizen-related data models.
+"""
 
-from pydantic import BaseModel, Field
 from typing import Optional
+from pydantic import BaseModel, Field
 
 
 class CitizenBase(BaseModel):
+    """Base schema for citizen information."""
+
     name: str = Field(..., max_length=100)
     email: Optional[str] = Field(None, max_length=100)
     phone_number: Optional[str] = Field(None, max_length=20)
@@ -12,14 +16,18 @@ class CitizenBase(BaseModel):
 
 
 class CitizenCreate(CitizenBase):
-    pass
+    """Schema for creating a new citizen."""
 
 
 class CitizenUpdate(CitizenBase):
+    """Schema for updating citizen information."""
+
     email: Optional[str] = Field(None, max_length=100)
     phone_number: Optional[str] = Field(None, max_length=20)
 
 
-class CizenTrustScoreUpdate(BaseModel):
+class CitizenTrustScoreUpdate(BaseModel):
+    """Schema for updating citizen trust score."""
+
     citizen_id: int
     trust_score: int

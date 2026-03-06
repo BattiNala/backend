@@ -1,9 +1,15 @@
+"""
+Schemas for role-related data models.
+"""
+
 from pydantic import BaseModel
 
 
 class RoleBase(BaseModel):
+    """Base schema for role information."""
+
     role_name: str
 
 
 class RoleCreate(RoleBase):
-    pass
+    """Schema for creating a new role."""

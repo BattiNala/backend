@@ -1,7 +1,13 @@
+"""
+Schemas for authentication response models.
+"""
+
 from pydantic import BaseModel
 
 
 class LoginSuccessResponse(BaseModel):
+    """Schema for successful login response."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -12,4 +18,6 @@ class LoginSuccessResponse(BaseModel):
 
 
 class LoginFailureResponse(BaseModel):
+    """Schema for failed login response."""
+
     detail: str

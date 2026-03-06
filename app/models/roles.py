@@ -1,9 +1,12 @@
+"""Role model definition."""
+
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class Role(Base):
+class Role(Base):  # pylint: disable=too-few-public-methods
+    """Role assigned to users."""
     __tablename__ = "roles"
 
     role_id = Column(Integer, primary_key=True, autoincrement=True)

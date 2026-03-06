@@ -1,3 +1,7 @@
+"""
+Schemas for employee-related data models.
+"""
+
 from typing import Optional
 from enum import Enum
 
@@ -5,12 +9,16 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class EmployeeActivityStatus(str, Enum):
+    """Enumeration for employee activity status."""
+
     BUSY = "busy"
     AVAILABLE = "available"
     OFF_DUTY = "off_duty"
 
 
 class EmployeeBase(BaseModel):
+    """Base schema for employee information."""
+
     name: str = Field(..., max_length=100)
     email: EmailStr
     phone_number: str = Field(..., max_length=20)
@@ -18,19 +26,25 @@ class EmployeeBase(BaseModel):
 
 
 class EmployeeCreate(EmployeeBase):
-    pass
+    """Schema for creating a new employee."""
 
 
 class EmployeeUpdate(EmployeeBase):
+    """Schema for updating employee information."""
+
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = Field(None, max_length=20)
 
 
 class EmployeeTeamUpdate(BaseModel):
+    """Schema for updating employee's team assignment."""
+
     employee_id: int
     team_id: int
 
 
 class EmployeeStatusUpdate(BaseModel):
+    """Schema for updating employee's activity status."""
+
     employee_id: int
     current_status: EmployeeActivityStatus

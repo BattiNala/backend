@@ -1,3 +1,7 @@
+"""OTP code model definition."""
+
+# pylint: disable=not-callable
+
 from uuid import uuid4
 from sqlalchemy import (
     Column,
@@ -17,7 +21,8 @@ from app.db.base import Base
 from app.schemas.otp import OtpChannel, OtpPurpose
 
 
-class OtpCode(Base):
+class OtpCode(Base):  # pylint: disable=too-few-public-methods
+    """One-time password request and verification metadata."""
     __tablename__ = "otp_codes"
 
     otp_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)

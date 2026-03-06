@@ -1,7 +1,13 @@
+"""
+Schemas for team-related data models.
+"""
+
 from pydantic import BaseModel, Field
 
 
 class TeamBase(BaseModel):
+    """Base schema for team information."""
+
     team_name: str = Field(..., max_length=100)
     status: bool = Field(..., description="Availability status of the team")
     department_id: int = Field(
@@ -13,10 +19,12 @@ class TeamBase(BaseModel):
 
 
 class TeamCreate(TeamBase):
-    pass
+    """Schema for creating a new team."""
 
 
 class TeamUpdate(BaseModel):
+    """Schema for updating team information."""
+
     team_name: str = Field(None, max_length=100)
     status: bool = Field(None, description="Availability status of the team")
     # department_id: int = Field(
@@ -28,5 +36,7 @@ class TeamUpdate(BaseModel):
 
 
 class TeamChangeStatus(BaseModel):
+    """Schema for changing team status."""
+
     team_id: int = Field(..., description="ID of the team to change status")
     status: bool = Field(..., description="New status of the team")

@@ -1,3 +1,5 @@
+"""Employee model definition."""
+
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum as sql_enum
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -5,7 +7,8 @@ from app.db.base import Base
 from app.schemas.employee import EmployeeActivityStatus as ActivityStatus
 
 
-class Employee(Base):
+class Employee(Base):  # pylint: disable=too-few-public-methods
+    """Employee profile for a user account."""
     __tablename__ = "employees"
 
     employee_id = Column(Integer, primary_key=True, autoincrement=True)

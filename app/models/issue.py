@@ -1,4 +1,7 @@
-from enum import Enum
+"""Issue model definition."""
+
+# pylint: disable=not-callable
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -11,20 +14,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
-
-class IssueType(str, Enum):
-    ELECTRICITY = "ELECTRICITY"
-    SEWAGE = "SEWAGE"
+from app.schemas.issue import IssueType, IssueStatus
 
 
-class IssueStatus(str, Enum):
-    REJECTED = "REJECTED"
-    OPEN = "OPEN"
-    IN_PROGRESS = "IN_PROGRESS"
-    RESOLVED = "RESOLVED"
+class Issue(Base):  # pylint: disable=too-few-public-methods
+    """Model representing an issue reported by a citizen."""
 
-
-class Issue(Base):
     __tablename__ = "issues"
 
     issue_id = Column(Integer, primary_key=True, autoincrement=True)

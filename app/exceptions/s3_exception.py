@@ -1,7 +1,9 @@
+"""
+Custom exceptions for S3-related errors."""
+
+
 class S3Exception(Exception):
     """Base exception for S3-related errors."""
-
-    pass
 
 
 class S3UploadException(S3Exception):

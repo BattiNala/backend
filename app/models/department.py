@@ -1,9 +1,12 @@
+"""Department model definition."""
+
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class Department(Base):
+class Department(Base):  # pylint: disable=too-few-public-methods
+    """Department grouping for teams."""
     __tablename__ = "departments"
 
     department_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -13,4 +16,9 @@ class Department(Base):
     )
 
     def __repr__(self):
-        return f"<Department(department_id={self.department_id}, department_name='{self.department_name}')>"
+        return (
+            "<Department("
+            f"department_id={self.department_id}, "
+            f"department_name='{self.department_name}'"
+            ")>"
+        )
