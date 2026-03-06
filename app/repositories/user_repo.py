@@ -58,3 +58,11 @@ class UserRepository:
         if user:
             return user.role.role_name
         return None
+
+    async def get_user_with_citizen_profile(self, user_id: int) -> User:
+        result = await self.db.execute(
+            select(User)
+            .options(selectinload(User.citizen_profile))
+            .where(User.user_id == user_id)
+        )
+        return result.scalars().first()
