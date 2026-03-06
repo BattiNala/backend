@@ -3,10 +3,11 @@
 import logging
 import logging.handlers
 
-from app.core import logging as log_module
+from app.core.logger import app_logger as log_module
 
 
 def test_logging_setup_creates_handlers_and_dir():
+    """Test that the logging setup creates the expected handlers and log directory."""
     logger = log_module.logger
 
     assert logger.name == "battinala-backend"

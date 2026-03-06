@@ -53,10 +53,11 @@ class CitizenRegisterRequest(UserCreate):
     )
 
     @model_validator(mode="after")
-    def check_contact(cls, values):
-        if not values.phone_number and not values.email:
+    def check_contact(self):
+        """Ensure at least one contact channel is provided."""
+        if not self.phone_number and not self.email:
             raise ValueError("At least one of phone_number or email must be provided.")
-        return values
+        return self
 
 
 class CitizenRegisterResponse(TokenResponse):
