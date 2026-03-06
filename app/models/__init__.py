@@ -1,3 +1,4 @@
+"""SQLAlchemy model exports."""
 # flake8: noqa
 from .citizens import Citizen
 from .department import Department

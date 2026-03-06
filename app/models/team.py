@@ -1,16 +1,24 @@
+"""Team model definition."""
+
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class Team(Base):
+class Team(Base):  # pylint: disable=too-few-public-methods
+    """
+    Model representing a team of employees responsible for handling issues.
+    Each team belongs to a department and has a base location with a coverage radius.
+    The team's availability status is determined by the availability of its members."""
+
     __tablename__ = "teams"
 
     team_id = Column(Integer, primary_key=True, autoincrement=True)
     team_name = Column(String(100), nullable=False, unique=True)
 
     # availibility status of the team based on the availability of its members
-    # if all members are busy, then the team is considered busy. If at least one member is available,
+    # if all members are busy, then the team is considered busy.
+    # If at least one member is available,
     # the team is considered available.
     status = Column(Boolean, nullable=False, default=True)
     deapartment_id = Column(
@@ -34,4 +42,6 @@ class Team(Base):
     )
 
     def __repr__(self):
-        return f"<Team(team_id={self.team_id}, team_name='{self.team_name}', status='{self.status}')>"
+        return f"""
+        <Team(team_id={self.team_id},team_name='{self.team_name}', status='{self.status}')>
+        """

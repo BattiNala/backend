@@ -1,3 +1,7 @@
+"""
+Custom exceptions for OTP-related errors."""
+
+
 class OtpResendCooldownException(Exception):
     """Custom exception for OTP resend cooldown."""
 

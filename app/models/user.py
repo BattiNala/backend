@@ -1,9 +1,12 @@
+"""User model definition."""
+
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class User(Base):
+class User(Base):  # pylint: disable=too-few-public-methods
+    """Application user credentials and role mapping."""
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -16,8 +19,27 @@ class User(Base):
     is_verified = Column(Boolean, nullable=False, default=False)
 
     role = relationship("Role", back_populates="users", foreign_keys=[role_id])
-    citizen_profile = relationship("Citizen", back_populates="user", uselist=False)
-    employee_profile = relationship("Employee", back_populates="user", uselist=False)
+    citizen_profile = relationship(
+        "Citizen",
+        back_populates="user",
+        uselist=False,
+    )
+    employee_profile = relationship(
+        "Employee",
+        back_populates="user",
+        uselist=False,
+    )
+    otp_codes = relationship(
+        "OtpCode", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
-        return f"<User(user_id={self.user_id}, username='{self.username}', role_id={self.role_id}, status={self.status}, is_verified={self.is_verified})>"
+        return (
+            "<User("
+            f"user_id={self.user_id}, "
+            f"username='{self.username}', "
+            f"role_id={self.role_id}, "
+            f"status={self.status}, "
+            f"is_verified={self.is_verified}"
+            ")>"
+        )

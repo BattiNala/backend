@@ -1,3 +1,5 @@
+# pylint: disable=missing-module-docstring
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.roles import Role
 from app.repositories.role_repo import RoleRepository

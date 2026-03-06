@@ -1,20 +1,28 @@
+"""
+Authentication-related schema definitions for user, token, and citizen registration.
+"""
+
 from pydantic import BaseModel, Field, model_validator
 
 
 class UserBase(BaseModel):
+    """Base schema for user credentials."""
+
     username: str = Field(..., max_length=50)
     password: str = Field(..., min_length=6)
 
 
 class UserCreate(UserBase):
-    pass
+    """Schema for creating a new user."""
 
 
 class UserLogin(UserBase):
-    pass
+    """Schema for user login request."""
 
 
 class TokenResponse(BaseModel):
+    """Schema for authentication token response."""
+
     access_token: str
     refresh_token: str
     role_name: str = Field(
@@ -23,14 +31,18 @@ class TokenResponse(BaseModel):
 
 
 class TokenRefreshRequest(BaseModel):
+    """Schema for token refresh request."""
+
     refresh_token: str
 
 
 class TokenRefreshResponse(TokenResponse):
-    pass
+    """Schema for token refresh response."""
 
 
 class CitizenRegisterRequest(UserCreate):
+    """Schema for citizen registration request."""
+
     name: str = Field(..., max_length=100, description="User's full name")
     phone_number: str | None = Field(
         None, max_length=15, description="User's phone number"
@@ -48,6 +60,8 @@ class CitizenRegisterRequest(UserCreate):
 
 
 class CitizenRegisterResponse(TokenResponse):
+    """Schema for citizen registration response."""
+
     is_verified: bool = Field(
         ..., description="Indicates if the user's email is verified"
     )

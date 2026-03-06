@@ -1,9 +1,12 @@
+"""Citizen model definition."""
+
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class Citizen(Base):
+class Citizen(Base):  # pylint: disable=too-few-public-methods
+    """Citizen profile linked to a user account."""
     __tablename__ = "citizens"
 
     citizen_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -30,4 +33,13 @@ class Citizen(Base):
     # )
 
     def __repr__(self):
-        return f"<Citizen(citizen_id={self.citizen_id}, name='{self.name}', email='{self.email}', phone_number='{self.phone_number}', home_address='{self.home_address}', trust_score={self.trust_score})>"
+        return (
+            "<Citizen("
+            f"citizen_id={self.citizen_id}, "
+            f"name='{self.name}', "
+            f"email='{self.email}', "
+            f"phone_number='{self.phone_number}', "
+            f"home_address='{self.home_address}', "
+            f"trust_score={self.trust_score}"
+            ")>"
+        )
