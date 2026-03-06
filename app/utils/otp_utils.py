@@ -1,3 +1,7 @@
+"""
+Utility module for OTP generation, hashing, and verification.
+"""
+
 import secrets
 import hmac
 import hashlib
@@ -5,6 +9,8 @@ from datetime import datetime, timezone
 
 
 class OtpUtils:
+    """Utility class for OTP generation, hashing, and verification."""
+
     @staticmethod
     def handle_otp_generation(otp_length: int = 6) -> tuple[str, bytes, bytes]:
         """
@@ -49,11 +55,11 @@ class OtpUtils:
         return hmac.new(salt, otp_bytes, hashlib.sha256).digest()
 
     @staticmethod
-    def verify_otp(otp_input: str, salt: bytes, stored_hash: bytes) -> bool:
+    def verify_otp(otp_input: str, salt: bytes, stored_hash: bytes, expires_at) -> bool:
         """
         Verify OTP using constant-time comparison.
         """
-        if OtpUtils.is_otp_expired(stored_hash):
+        if OtpUtils.is_otp_expired(expires_at):
             return False
         candidate_hash = OtpUtils.hash_otp(otp_input, salt)
         return hmac.compare_digest(candidate_hash, stored_hash)
@@ -69,7 +75,8 @@ class OtpUtils:
     @staticmethod
     def is_resend_available(resend_available_at) -> tuple[bool, int]:
         """
-        Check if the OTP resend is available based on the current time and the resend_available_at timestamp.
+        Check if the OTP resend is available based on the
+        current time and the resend_available_at timestamp.
         """
         time_remaining = 0
 
