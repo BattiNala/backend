@@ -1,33 +1,27 @@
-"""Role endpoints for administrative operations. Superadmin-only access is required for role management."""
+"""
+Role endpoints for administrative operations.
+Superadmin-only access is required for role management.
+"""
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1 import router
+from app.api.v1.dependencies import get_current_user, require_superadmin
+from app.api.v1.utils import with_db_error
 from app.db.session import get_db
-from app.models.user import User
-
-from app.api.v1.dependencies import get_current_user
-from app.repositories.user_repo import UserRepository
 from app.repositories.role_repo import RoleRepository
 from app.schemas.roles import RoleCreate, RoleList
-router = APIRouter()
-    
-@router.post("/create-role")
+
+role_router = APIRouter()
+
+
+@role_router.post("/create-role", dependencies=[Depends(require_superadmin)])
 async def create_role(
     role_create: RoleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Create a new role when requested by a superadmin user."""
-    try:
-        user_repo = UserRepository(db)
-        user_role_name = await user_repo.get_user_role_name(current_user.user_id)
-        if user_role_name != "superadmin":
-            raise HTTPException(
-                status_code=403, detail="Access forbidden: Superadmin only"
-            )
-
+    async def _create() -> dict:
         existing_role = await RoleRepository(db).get_role_by_name(role_create.role_name)
         if existing_role:
             raise HTTPException(status_code=400, detail="Role already exists")
@@ -35,18 +29,20 @@ async def create_role(
         new_role = await RoleRepository(db).create_role(role_create.role_name)
         return {"message": f"Role '{new_role.role_name}' created successfully"}
 
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return await with_db_error(_create)
 
-@router.get("/list-roles", response_model=RoleList)
+
+@role_router.get(
+    "/list-roles",
+    response_model=RoleList,
+    dependencies=[Depends(get_current_user)],
+)
 async def list_roles(
-    db: AsyncSession = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db),
 ):
     """List all roles."""
-    try:
+    async def _list() -> dict:
         roles = await RoleRepository(db).list_roles()
         return {"roles": roles}
 
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return await with_db_error(_list)
