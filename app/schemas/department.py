@@ -4,6 +4,7 @@ Schemas for department-related data models.
 
 from pydantic import BaseModel
 
+
 class DepartmentBase(BaseModel):
     """Base schema for department information."""
 
@@ -13,11 +14,13 @@ class DepartmentBase(BaseModel):
 class DepartmentCreate(DepartmentBase):
     """Schema for creating a new department."""
 
+
 class Department(DepartmentBase):
     """Schema for department information returned in responses."""
 
     department_id: int
     model_config = {"from_attributes": True}
+
 
 class DepartmentList(BaseModel):
     """Schema for listing multiple departments."""

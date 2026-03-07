@@ -14,11 +14,13 @@ class RoleBase(BaseModel):
 class RoleCreate(RoleBase):
     """Schema for creating a new role."""
 
+
 class Role(RoleBase):
     """Schema for role information returned in responses."""
 
     role_id: int
     model_config = {"from_attributes": True}
+
 
 class RoleList(BaseModel):
     """Schema for listing multiple roles."""
