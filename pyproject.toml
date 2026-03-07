@@ -30,3 +30,13 @@ dev = [
     "pylint>=4.0.5",
     "pytest>=9.0.2",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
