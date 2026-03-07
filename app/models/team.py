@@ -1,7 +1,8 @@
 """Team model definition."""
 
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+
 from app.db.base import Base
 
 
@@ -21,7 +22,7 @@ class Team(Base):  # pylint: disable=too-few-public-methods
     # If at least one member is available,
     # the team is considered available.
     status = Column(Boolean, nullable=False, default=True)
-    deapartment_id = Column(
+    department_id = Column(
         Integer,
         ForeignKey("departments.department_id", ondelete="CASCADE"),
         nullable=False,
@@ -37,9 +38,7 @@ class Team(Base):  # pylint: disable=too-few-public-methods
         cascade="all, delete",
     )
 
-    department = relationship(
-        "Department", back_populates="teams", foreign_keys=[deapartment_id]
-    )
+    department = relationship("Department", back_populates="teams", foreign_keys=[department_id])
 
     def __repr__(self):
         return f"""
