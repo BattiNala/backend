@@ -1,13 +1,14 @@
 """Authentication and request-scoped dependencies for API v1."""
 
-from fastapi import Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
 import jwt
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.core.config import settings
+from app.db.session import get_db
 from app.exceptions.auth_expection import CredentialException
+from app.models.user import User
 from app.repositories.user_repo import UserRepository
 
 security = HTTPBearer()
@@ -32,3 +33,14 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+async def require_superadmin(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ensure the current user has the superadmin role."""
+    user_role_name = await UserRepository(db).get_user_role_name(current_user.user_id)
+    if user_role_name != "superadmin":
+        raise HTTPException(status_code=403, detail="Access forbidden: Superadmin only")
+    return current_user
