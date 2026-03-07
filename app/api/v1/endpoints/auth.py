@@ -6,48 +6,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.user import User
-from app.models.citizens import Citizen
-from app.models.roles import Role
-
-from app.repositories.otp_repo import OtpRepository
-from app.schemas.auth import (
-    UserLogin,
-    TokenResponse,
-    CitizenRegisterRequest,
-    TokenRefreshRequest,
-    CitizenRegisterResponse,
-)
-from app.schemas.otp import OtpVerificationRequest
-
-from app.repositories.user_repo import UserRepository
-from app.repositories.citizen_repo import CitizenRepository
-from app.repositories.role_repo import RoleRepository
-from app.schemas.otp import OtpChannel, OtpPurpose
-from app.services.notification_service import (
-    NotificationService,
-    EmailSender,
-    SMSSender,
-)
-
-
-from app.utils.otp_utils import OtpUtils
 from app.exceptions.auth_expection import (
-    UserAlreadyExistsException,
     InvalidCredentialException,
+    UserAlreadyExistsException,
 )
 from app.exceptions.otp_exception import OtpResendCooldownException
-
+from app.models.citizens import Citizen
+from app.models.roles import Role
+from app.models.user import User
+from app.repositories.citizen_repo import CitizenRepository
+from app.repositories.otp_repo import OtpRepository
+from app.repositories.role_repo import RoleRepository
+from app.repositories.user_repo import UserRepository
+from app.schemas.auth import (
+    CitizenRegisterRequest,
+    CitizenRegisterResponse,
+    TokenRefreshRequest,
+    TokenResponse,
+    UserLogin,
+)
+from app.schemas.otp import OtpChannel, OtpPurpose, OtpVerificationRequest
+from app.services.notification_service import (
+    EmailSender,
+    NotificationService,
+    SMSSender,
+)
 from app.utils.auth import (
     create_access_token,
-    verify_password,
-    get_password_hash,
     create_refresh_token,
     decode_refresh_token_or_raise,
+    get_password_hash,
+    verify_password,
 )
+from app.utils.otp_utils import OtpUtils
 
-
-router = APIRouter()
+auth_router = APIRouter()
 security = HTTPBearer()
 
 
@@ -76,7 +69,7 @@ def _resolve_channel_and_target(
     return target, channel
 
 
-@router.post("/citizen-register", response_model=TokenResponse)
+@auth_router.post("/citizen-register", response_model=TokenResponse)
 async def register(
     user_data: CitizenRegisterRequest,
     db: AsyncSession = Depends(get_db),
@@ -159,7 +152,7 @@ async def register(
         raise RuntimeError("Failed to register citizen.") from e
 
 
-@router.post("/login", response_model=TokenResponse)
+@auth_router.post("/login", response_model=TokenResponse)
 async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     """
     Authenticate user and return access
@@ -173,15 +166,11 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     access_token: str = create_access_token(data={"user_id": user.user_id})
     refresh_jwt: str = create_refresh_token(data={"user_id": user.user_id})
     role_name: str = getattr(user.role, "role_name", "citizen")
-    return TokenResponse(
-        access_token=access_token, refresh_token=refresh_jwt, role_name=role_name
-    )
+    return TokenResponse(access_token=access_token, refresh_token=refresh_jwt, role_name=role_name)
 
 
-@router.post("/refresh", response_model=TokenResponse)
-async def refresh_access_token(
-    request: TokenRefreshRequest, db: AsyncSession = Depends(get_db)
-):
+@auth_router.post("/refresh", response_model=TokenResponse)
+async def refresh_access_token(request: TokenRefreshRequest, db: AsyncSession = Depends(get_db)):
     """Issue a new access token using a valid refresh token."""
     user_id = decode_refresh_token_or_raise(request.refresh_token)
 
@@ -199,7 +188,7 @@ async def refresh_access_token(
     )
 
 
-@router.post("/resend-verification")
+@auth_router.post("/resend-verification")
 # Keep explicit intermediate values for readability of OTP cooldown flow.
 # pylint: disable=too-many-locals
 async def resend_verification_email(
@@ -228,9 +217,7 @@ async def resend_verification_email(
 
         otp_code, otp_salt, otp_hash = OtpUtils.handle_otp_generation()
 
-        target_user = await user_repo.get_user_with_citizen_profile(
-            current_user.user_id
-        )
+        target_user = await user_repo.get_user_with_citizen_profile(current_user.user_id)
         profile = target_user.citizen_profile if target_user else None
 
         if not profile:
@@ -280,7 +267,7 @@ async def resend_verification_email(
         raise RuntimeError("Failed to resend verification code.") from e
 
 
-@router.post("/verify")
+@auth_router.post("/verify")
 async def verify_user(
     request: OtpVerificationRequest,
     db: AsyncSession = Depends(get_db),
