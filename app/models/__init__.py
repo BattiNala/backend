@@ -1,4 +1,5 @@
 """SQLAlchemy model exports."""
+
 # flake8: noqa
 from .citizens import Citizen
 from .department import Department
@@ -7,3 +8,4 @@ from .user import User
 from .team import Team
 from .employee import Employee
 from .otp_code import OtpCode
+from .issue import Issue

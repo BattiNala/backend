@@ -24,6 +24,7 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
     __tablename__ = "issues"
 
     issue_id = Column(Integer, primary_key=True, autoincrement=True)
+    issue_label = Column(String(100), nullable=True, unique=True)
     issue_type = Column(
         Integer,
         ForeignKey("departments.department_id", ondelete="RESTRICT"),
@@ -33,6 +34,7 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
     description = Column(String(1000), nullable=False)
     status = Column(SQLEnum(IssueStatus, name="issue_status_enum"), nullable=False)
     is_anonymous = Column(Boolean, default=False, nullable=False)
+    contact_no = Column(String(20), nullable=True)
     reporter_id = Column(
         Integer,
         ForeignKey("citizens.citizen_id", ondelete="RESTRICT"),
