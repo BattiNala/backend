@@ -1,3 +1,5 @@
+"""Constants for the Battinala application."""
+
 CITIZEN_REGISTER_EMAIL = (
     "Hello {name},\n\n"
     "Thank you for registering as a citizen in Battinala. "

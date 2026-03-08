@@ -1,3 +1,5 @@
+# pylint: disable=missing-module-docstring
+
 import asyncio
 
 import httpx
@@ -15,8 +17,9 @@ headers = {
 
 
 async def send_request():
+    """Send a POST request to create an anonymous issue."""
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(ANON_ISSUE_URL, json=contact_less_payload, headers=headers)
+        response = await client.post(ANON_ISSUE_URL, json=payload, headers=headers)
         print(response.status_code)
         print(response.json())
 

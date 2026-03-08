@@ -5,14 +5,19 @@ User agent utility functions.
 
 def get_device_type(user_agent: str) -> str:
     """Determine the device type based on the user agent string."""
+    if not user_agent:
+        return "unknown"
+
+    if is_mobile_app_user_agent(user_agent):
+        return "mobile_app"
+    if is_browser_user_agent(user_agent):
+        return "browser"
     if is_mobile_user_agent(user_agent):
         return "mobile"
-    elif is_desktop_user_agent(user_agent):
+    if is_desktop_user_agent(user_agent):
         return "desktop"
-    elif is_browser_user_agent(user_agent):
-        return "browser"
-    else:
-        return "unknown"
+
+    return "unknown"
 
 
 def is_mobile_user_agent(user_agent: str) -> bool:
@@ -53,7 +58,7 @@ def is_browser_user_agent(user_agent: str) -> bool:
     return any(indicator in user_agent for indicator in browser_indicators)
 
 
-def mobile_app_user_agent(user_agent: str) -> bool:
+def is_mobile_app_user_agent(user_agent: str) -> bool:
     """Determine if the user agent string corresponds to a mobile app."""
     app_indicators = [
         "BattinalaApp",
