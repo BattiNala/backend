@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
+from app.core.constants import ACCOUNR_VERIFICATION_SUCCESS_EMAIL, CITIZEN_REGISTER_EMAIL
 from app.db.session import get_db
 from app.exceptions.auth_expection import (
     InvalidCredentialException,
@@ -21,6 +22,7 @@ from app.repositories.user_repo import UserRepository
 from app.schemas.auth import (
     CitizenRegisterRequest,
     CitizenRegisterResponse,
+    LoginResponse,
     TokenRefreshRequest,
     TokenResponse,
     UserLogin,
@@ -127,14 +129,7 @@ async def register(
         ).send_to_user_auto(
             user_id=new_user.user_id,
             subject="Welcome to Battinala!",
-            body=(
-                f"Hello {user_data.name},\n\n"
-                f"Thank you for registering as a citizen in Battinala. "
-                f"Your account is currently pending verification. "
-                f"Please use the {otp_code} to verify your account.\n\n"
-                f"Best regards,\n"
-                f"Battinala Team"
-            ),
+            body=CITIZEN_REGISTER_EMAIL.format(name=user_data.name, otp_code=otp_code),
         )
 
         return CitizenRegisterResponse(
@@ -152,7 +147,7 @@ async def register(
         raise RuntimeError("Failed to register citizen.") from e
 
 
-@auth_router.post("/login", response_model=TokenResponse)
+@auth_router.post("/login", response_model=LoginResponse)
 async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     """
     Authenticate user and return access
@@ -166,7 +161,12 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     access_token: str = create_access_token(data={"user_id": user.user_id})
     refresh_jwt: str = create_refresh_token(data={"user_id": user.user_id})
     role_name: str = getattr(user.role, "role_name", "citizen")
-    return TokenResponse(access_token=access_token, refresh_token=refresh_jwt, role_name=role_name)
+    return LoginResponse(
+        access_token=access_token,
+        refresh_token=refresh_jwt,
+        role_name=role_name,
+        is_verified=user.is_verified,
+    )
 
 
 @auth_router.post("/refresh", response_model=TokenResponse)
@@ -305,13 +305,7 @@ async def verify_user(
         ).send_to_user_auto(
             user_id=current_user.user_id,
             subject="Your Battinala Account is Verified!",
-            body=(
-                f"Hello {current_user.username},\n\n"
-                f"Congratulations! Your account has been verified. "
-                f"You can now access all the features of Battinala.\n\n"
-                f"Best regards,\n"
-                f"Battinala Team"
-            ),
+            body=ACCOUNR_VERIFICATION_SUCCESS_EMAIL.format(username=current_user.username),
         )
 
         return {"message": "User verified successfully."}
