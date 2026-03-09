@@ -37,7 +37,9 @@ class DepartmentAdmin(Base):
     )
 
     user = relationship("User", back_populates="department_admin_profile", foreign_keys=[user_id])
-    department = relationship("Department", back_populates="admins", foreign_keys=[department_id])
+    department = relationship(
+        "Department", back_populates="department_admins", foreign_keys=[department_id]
+    )
 
     def __repr__(self):
         return f"""
