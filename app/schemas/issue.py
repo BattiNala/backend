@@ -1,8 +1,9 @@
 """Issue-related enums used by API and persistence layers."""
 
 from enum import Enum
+from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class IssueStatus(str, Enum):
@@ -18,8 +19,14 @@ class IssueStatus(str, Enum):
 class IssueType(BaseModel):
     """Types of issues that can be reported, mapped to department IDs."""
 
-    issue_type: str
     issue_type_id: int
+    issue_type: str
+
+
+class IssueTypesList(BaseModel):
+    """Response model for listing issue types."""
+
+    types: list[IssueType]
 
 
 class IssueBase(BaseModel):
@@ -27,14 +34,38 @@ class IssueBase(BaseModel):
 
     issue_type: int
     description: str
-    is_anonymous: bool = False
+    # is_anonymous: bool = False
 
 
 class AnonymousIssueCreate(IssueBase):
     """Schema for creating a new anonymous issue."""
+
+    contact_no: str
+    issue_location: Optional[str] = None
+    latitude: float
+    longitude: float
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_contact_no(cls, values):
+        """Validate that contact_no is provided for anonymous issues."""
+        if values.get("is_anonymous") and not values.get("contact_no"):
+            raise ValueError("contact_no is required for anonymous issues")
+        return values
 
 
 class IssueCreate(IssueBase):
     """Schema for creating a new issue."""
 
     status: IssueStatus = IssueStatus.OPEN
+    latitude: float
+    longitude: float
+    issue_location: Optional[str] = None
+
+
+class AnonymousIssueResponse(BaseModel):
+    """Response model for an anonymous issue."""
+
+    issue_label: str
+    status: IssueStatus
+    created_at: str
