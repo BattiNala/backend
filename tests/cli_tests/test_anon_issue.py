@@ -7,7 +7,14 @@ import httpx
 BASE_URL = "http://localhost:8000"
 ANON_ISSUE_URL = f"{BASE_URL}/api/v1/issues/anon-create"
 contact_less_payload = {"issue_type": 1, "description": "Pole Dhalyo", "is_anonymous": True}
-payload = {"issue_type": 1, "description": "Pole Dhalyo", "contact_no": "985207412"}
+payload = {
+    "issue_type": 1,
+    "description": "Pole Dhalyo",
+    "contact_no": "985207412",
+    "issue_location": "Kathmandu, Nepal",
+    "latitude": 27.70,
+    "longitude": 85.324,
+}
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
