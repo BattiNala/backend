@@ -1,8 +1,9 @@
 """Repository helpers for `Citizen` persistence and lookup."""
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
 from app.models.citizens import Citizen
 
 
@@ -24,9 +25,7 @@ class CitizenRepository:
     async def get_citizen_by_user_id(self, user_id: int) -> Citizen:
         """Return a citizen profile by associated user id."""
         result = await self.db.execute(
-            select(Citizen)
-            .options(selectinload(Citizen.user))
-            .where(Citizen.user_id == user_id)
+            select(Citizen).options(selectinload(Citizen.user)).where(Citizen.user_id == user_id)
         )
         return result.scalars().first()
 

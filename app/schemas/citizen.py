@@ -3,6 +3,7 @@ Schemas for citizen-related data models.
 """
 
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -30,4 +31,14 @@ class CitizenTrustScoreUpdate(BaseModel):
     """Schema for updating citizen trust score."""
 
     citizen_id: int
+    trust_score: int
+
+
+class CitizenProfile(BaseModel):
+    """Schema for representing a citizen's profile."""
+
+    name: str
+    email: Optional[str]
+    phone_number: Optional[str]
+    address: Optional[str]
     trust_score: int
