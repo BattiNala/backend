@@ -26,3 +26,13 @@ class DepartmentList(BaseModel):
     """Schema for listing multiple departments."""
 
     departments: list[Department]
+
+
+class DepartmentAdminCreate(BaseModel):
+    """Schema for creating a department admin."""
+
+    department_id: int
+    name: str
+    email: str
+    phone_number: str
+    password: str
