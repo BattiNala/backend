@@ -1,3 +1,5 @@
+# pylint: disable=duplicate-code
+
 """
 DepartmentAdmin model definition.
 """
@@ -8,7 +10,7 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class DepartmentAdmin(Base):
+class DepartmentAdmin(Base):  # pylint: disable=too-few-public-methods,duplicate-code
     """
     Model representing a department administrator responsible for managing a department.
     Each department admin is associated with a specific department and has contact information.
