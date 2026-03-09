@@ -10,9 +10,7 @@ class TeamBase(BaseModel):
 
     team_name: str = Field(..., max_length=100)
     status: bool = Field(..., description="Availability status of the team")
-    department_id: int = Field(
-        ..., description="ID of the department the team belongs to"
-    )
+    department_id: int = Field(..., description="ID of the department the team belongs to")
     base_latitude: str = Field(..., max_length=50)
     base_longitude: str = Field(..., max_length=50)
     coverage_radius_km: int = Field(..., description="Coverage radius in kilometers")
@@ -40,3 +38,16 @@ class TeamChangeStatus(BaseModel):
 
     team_id: int = Field(..., description="ID of the team to change status")
     status: bool = Field(..., description="New status of the team")
+
+
+class Team(TeamBase):
+    """Schema for team information returned in responses."""
+
+    team_id: int
+    model_config = {"from_attributes": True}
+
+
+class TeamList(BaseModel):
+    """Schema for listing multiple teams."""
+
+    teams: list[Team]
