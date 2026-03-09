@@ -104,7 +104,7 @@ async def register(
                 user_id=new_user.user_id,
                 phone_number=user_data.phone_number,
                 email=user_data.email,
-                home_address=user_data.home_address,
+                home_address=user_data.home_address or "Unspecified",
             )
         )
         otp_code, otp_salt, otp_hash = OtpUtils.handle_otp_generation()
