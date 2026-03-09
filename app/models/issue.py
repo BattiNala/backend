@@ -41,7 +41,6 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
         nullable=True,
         index=True,
     )
-
     assignee_id = Column(
         Integer,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
@@ -62,6 +61,11 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
         "Employee", back_populates="assigned_issues", foreign_keys=[assignee_id]
     )
     department = relationship("Department", back_populates="issues", foreign_keys=[issue_type])
-    # attachments = relationship(
-    #     "Attachment", back_populates="issue", cascade="all, delete-orphan"
-    # )
+
+    issue_location = relationship(
+        "IssueLocation",
+        back_populates="issue",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
