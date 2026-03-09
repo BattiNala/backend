@@ -44,3 +44,44 @@ async def require_superadmin(
     if user_role_name != "superadmin":
         raise HTTPException(status_code=403, detail="Access forbidden: Superadmin only")
     return current_user
+
+
+async def require_department_admin(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ensure the current user has either the department admin or superadmin role."""
+    user_role_name = await UserRepository(db).get_user_role_name(current_user.user_id)
+    if user_role_name not in ["department_admin", "superadmin"]:
+        raise HTTPException(
+            status_code=403, detail="Access forbidden: Department Admin or Superadmin only"
+        )
+    return current_user
+
+
+async def require_staff(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ensure the current user has either the staff or department admin."""
+    user_role_name = await UserRepository(db).get_user_role_name(current_user.user_id)
+    if user_role_name not in ["staff", "department_admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Access forbidden: Staff or Department Admin",
+        )
+    return current_user
+
+
+async def require_citizen(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ensure the current user has either the citizen"""
+    user_role_name = await UserRepository(db).get_user_role_name(current_user.user_id)
+    if user_role_name != "citizen":
+        raise HTTPException(
+            status_code=403,
+            detail="Access forbidden: Citizen only",
+        )
+    return current_user
