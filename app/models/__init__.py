@@ -9,3 +9,4 @@ from .team import Team
 from .employee import Employee
 from .otp_code import OtpCode
 from .issue import Issue
+from .issue_location import IssueLocation
