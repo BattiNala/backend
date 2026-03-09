@@ -2,19 +2,19 @@
 
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+
 from app.db.base import Base
 
 
 class User(Base):  # pylint: disable=too-few-public-methods
     """Application user credentials and role mapping."""
+
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(50), nullable=False, unique=True)
     password_hash = Column(String(128), nullable=False)
-    role_id = Column(
-        Integer, ForeignKey("roles.role_id", ondelete="CASCADE"), nullable=False
-    )
+    role_id = Column(Integer, ForeignKey("roles.role_id", ondelete="CASCADE"), nullable=False)
     status = Column(Boolean, nullable=False, default=True)
     is_verified = Column(Boolean, nullable=False, default=False)
 
@@ -29,9 +29,12 @@ class User(Base):  # pylint: disable=too-few-public-methods
         back_populates="user",
         uselist=False,
     )
-    otp_codes = relationship(
-        "OtpCode", back_populates="user", cascade="all, delete-orphan"
+    department_admin_profile = relationship(
+        "DepartmentAdmin",
+        back_populates="user",
+        uselist=False,
     )
+    otp_codes = relationship("OtpCode", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return (
