@@ -18,6 +18,7 @@ class Department(Base):  # pylint: disable=too-few-public-methods
         "DepartmentAdmin", back_populates="department", cascade="all, delete-orphan"
     )
     issues = relationship("Issue", back_populates="department", cascade="all, delete-orphan")
+    employees = relationship("Employee", back_populates="department", cascade="all, delete-orphan")
 
     def __repr__(self):
         return (
