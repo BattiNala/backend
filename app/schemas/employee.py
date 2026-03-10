@@ -2,8 +2,8 @@
 Schemas for employee-related data models.
 """
 
-from typing import Optional
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -47,4 +47,15 @@ class EmployeeStatusUpdate(BaseModel):
     """Schema for updating employee's activity status."""
 
     employee_id: int
+    current_status: EmployeeActivityStatus
+
+
+class EmployeeProfile(BaseModel):
+    """Schema for representing an employee's profile."""
+
+    name: str
+    email: EmailStr
+    phone_number: str
+    team_name: Optional[str]
+    department_name: str
     current_status: EmployeeActivityStatus

@@ -1,3 +1,5 @@
+# pylint: disable=duplicate-code
+
 """Team model definition."""
 
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
@@ -6,7 +8,7 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class Team(Base):  # pylint: disable=too-few-public-methods
+class Team(Base):  # pylint: disable=too-few-public-methods,duplicate-code
     """
     Model representing a team of employees responsible for handling issues.
     Each team belongs to a department and has a base location with a coverage radius.
