@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Typed runtime configuration for the application."""
 
     APP_NAME: str = "BattiNala Backend"
-    VERSION: str = "0.1.0"
+    VERSION: str = "0.2.0"
     API_V1_STR: str = "/api/v1"
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
