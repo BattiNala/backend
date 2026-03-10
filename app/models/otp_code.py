@@ -3,6 +3,7 @@
 # pylint: disable=not-callable
 
 from uuid import uuid4
+
 from sqlalchemy import (
     Column,
     DateTime,
@@ -13,7 +14,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import UUID, INET
+from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -23,6 +24,7 @@ from app.schemas.otp import OtpChannel, OtpPurpose
 
 class OtpCode(Base):  # pylint: disable=too-few-public-methods
     """One-time password request and verification metadata."""
+
     __tablename__ = "otp_codes"
 
     otp_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)

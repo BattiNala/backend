@@ -14,6 +14,9 @@ class Department(Base):  # pylint: disable=too-few-public-methods
     department_id = Column(Integer, primary_key=True, autoincrement=True)
     department_name = Column(String(100), nullable=False, unique=True)
     teams = relationship("Team", back_populates="department", cascade="all, delete-orphan")
+    department_admins = relationship(
+        "DepartmentAdmin", back_populates="department", cascade="all, delete-orphan"
+    )
     issues = relationship("Issue", back_populates="department", cascade="all, delete-orphan")
 
     def __repr__(self):
