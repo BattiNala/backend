@@ -29,11 +29,6 @@ class User(Base):  # pylint: disable=too-few-public-methods
         back_populates="user",
         uselist=False,
     )
-    department_admin_profile = relationship(
-        "DepartmentAdmin",
-        back_populates="user",
-        uselist=False,
-    )
     otp_codes = relationship("OtpCode", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
