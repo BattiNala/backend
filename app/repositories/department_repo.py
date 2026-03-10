@@ -6,8 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.department import Department
-from app.models.department_admin import DepartmentAdmin
-from app.schemas.department import DepartmentAdminCreate
 
 
 class DepartmentRepository:
@@ -42,19 +40,3 @@ class DepartmentRepository:
             select(Department).where(Department.department_name == department_name)
         )
         return result.scalars().first()
-
-    async def create_department_admin(
-        self, department_admin_create: DepartmentAdminCreate, user_id: int
-    ) -> DepartmentAdmin:
-        """Create a new department admin."""
-        department_admin = DepartmentAdmin(
-            name=department_admin_create.name,
-            email=department_admin_create.email,
-            phone_number=department_admin_create.phone_number,
-            user_id=user_id,
-            department_id=department_admin_create.department_id,
-        )
-        self.db.add(department_admin)
-        await self.db.commit()
-        await self.db.refresh(department_admin)
-        return department_admin

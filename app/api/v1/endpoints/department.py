@@ -3,17 +3,18 @@ Department endpoints for administrative operations.
 Superadmin-only access is required for department management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user, require_superadmin
 from app.api.v1.utils import with_db_error
 from app.db.session import get_db
 from app.models.department import Department
-from app.models.department_admin import DepartmentAdmin
+from app.models.employee import Employee
 from app.models.roles import Role
 from app.models.user import User
 from app.repositories.department_repo import DepartmentRepository
+from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.role_repo import RoleRepository
 from app.repositories.user_repo import UserRepository
 from app.schemas.department import DepartmentAdminCreate, DepartmentCreate, DepartmentList
@@ -73,35 +74,59 @@ async def list_departments(
     dependencies=[Depends(require_superadmin)],
     summary="Add a department admin to a department",
     description="Add a department admin to a department (superadmin only).",
+    status_code=status.HTTP_201_CREATED,
 )
 async def add_department_admin(
     department_admin_create: DepartmentAdminCreate, db: AsyncSession = Depends(get_db)
 ):
     """Add a department admin to a department (superadmin only)."""
-    role_repo = RoleRepository(db)
-    department_admin_role: Role = await role_repo.get_role_by_name("department_admin")
-    if not department_admin_role:
-        raise HTTPException(status_code=500, detail="Department admin role not found")
-    password_hash = get_password_hash(department_admin_create.password)
-    user_repo = UserRepository(db)
-    new_user: User = await user_repo.create_user(
-        User(
-            username=department_admin_create.email,
-            password_hash=password_hash,
-            role_id=department_admin_role.role_id,
-            status=True,
-            is_verified=True,
-        )
-    )
+    try:
+        role_repo = RoleRepository(db)
+        department_admin_role: Role = await role_repo.get_role_by_name("department_admin")
+        if not department_admin_role:
+            raise HTTPException(status_code=500, detail="Department admin role not found")
 
-    department_repo = DepartmentRepository(db)
-    new_department_admin: DepartmentAdmin = await department_repo.create_department_admin(
-        department_admin_create, user_id=new_user.user_id
-    )
-    department = await department_repo.get_department_by_id(department_admin_create.department_id)
-    return {
-        "message": (
-            f"Department admin '{new_department_admin.name}' created successfully for "
-            f"department '{department.department_name}'"
+        user_repo = UserRepository(db)
+        # Check if user already exists with the given email
+        existing_user = await user_repo.get_user_by_username(department_admin_create.email)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="User with this email already exists")
+
+        password_hash = get_password_hash(department_admin_create.password)
+        new_user: User = await user_repo.create_user(
+            User(
+                username=department_admin_create.email,
+                password_hash=password_hash,
+                role_id=department_admin_role.role_id,
+                status=True,
+                is_verified=True,
+            )
         )
-    }
+
+        employee_repo = EmployeeRepository(db)
+        new_department_admin: Employee = await employee_repo.create_employee(
+            Employee(
+                name=department_admin_create.name,
+                email=department_admin_create.email,
+                phone_number=department_admin_create.phone_number,
+                user_id=new_user.user_id,
+                department_id=department_admin_create.department_id,
+                team_id=None,
+            )
+        )
+        department_repo = DepartmentRepository(db)
+        department: Department = await department_repo.get_department_by_id(
+            department_admin_create.department_id
+        )
+        await db.commit()
+        return {
+            "message": (
+                f"Department admin '{new_department_admin.name}' created successfully for "
+                f"department '{department.department_name}'"
+            )
+        }
+
+    except Exception as e:
+        await db.rollback()
+        print(f"Error creating department admin: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create department admin") from e

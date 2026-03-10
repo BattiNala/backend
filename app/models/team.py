@@ -2,7 +2,7 @@
 
 """Team model definition."""
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -30,13 +30,13 @@ class Team(Base):  # pylint: disable=too-few-public-methods,duplicate-code
         nullable=False,
         index=True,
     )
-    base_latitude = Column(String(50), nullable=False)
-    base_longitude = Column(String(50), nullable=False)
+    base_latitude = Column(Numeric(8, 4), nullable=False)
+    base_longitude = Column(Numeric(8, 4), nullable=False)
     coverage_radius_km = Column(Integer, nullable=False)
 
     members = relationship(
         "Employee",
-        back_populates="teams",
+        back_populates="team",
         cascade="all, delete",
     )
 
