@@ -16,16 +16,37 @@ team_router = APIRouter()
 
 
 @team_router.get("/teams")
-async def get_teams():
+async def get_teams(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_department_admin),
+):
     """
-    Get all teams.
+    Get all teams of my department.
     """
-    # Placeholder implementation, replace with actual database query
-    return {"message": "List of teams will be returned here."}
+    user_repository = UserRepository(db)
+    user_with_profile = await user_repository.get_user_with_employee_profile(
+        user_id=current_user.user_id
+    )
+    employee_profile = user_with_profile.employee_profile if user_with_profile else None
+    if not employee_profile:
+        return {"error": "Current user does not have an employee profile."}
+    user_department = employee_profile.department_id
+    if not user_department:
+        return {"error": "Current user's employee profile is not associated with any department."}
+
+    team_repository = TeamRepository(db)
+    teams: list[Team] = await team_repository.list_teams_by_department(
+        department_id=user_department
+    )
+    return {"teams": teams}
 
 
 @team_router.get("/teams/{team_id}")
-async def get_team(team_id: int):
+async def get_team(
+    team_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_department_admin),
+):
     """
     Get a team by ID.
     """

@@ -43,3 +43,8 @@ class TeamRepository:
         """List all teams."""
         result = await self.db.execute(select(Team))
         return result.scalars().all()
+
+    async def list_teams_by_department(self, department_id: int):
+        """List all teams in a specific department."""
+        result = await self.db.execute(select(Team).where(Team.department_id == department_id))
+        return result.scalars().all()
