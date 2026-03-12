@@ -35,6 +35,11 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 def _ensure_browser_user_agent(request: Request) -> None:
     user_agent = request.headers.get("user-agent")
+    if not user_agent:
+        raise HTTPException(
+            status_code=400,
+            detail="User-Agent header is required to create anonymous issues.",
+        )
     user_agent_check = get_device_type(user_agent)
     if user_agent_check != "browser":
         raise HTTPException(
@@ -89,7 +94,8 @@ async def _upload_photos_to_s3(
                 await out_file.write(chunk)
 
         object_key = await s3.upload_file(Path(temp_path))
-        attachment_paths.append(object_key)
+        if object_key:
+            attachment_paths.append(object_key)
     return attachment_paths, temp_paths
 
 
