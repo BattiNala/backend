@@ -1,5 +1,7 @@
 """Application settings loaded from environment and defaults."""
 
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,11 +27,11 @@ class Settings(BaseSettings):
     # S3 Settings
     S3_BUCKET_NAME: str = "battinala"
     S3_REGION_NAME: str = "us-east-1"
-    # S3_ENDPOINT_URL: str
+    S3_ENDPOINT_URL: str
     # e.g. "https://<accountid>.r2.cloudflarestorage.com" for Cloudflare R2
-    # S3_ACCESS_KEY_ID: str
-    # S3_SECRET_ACCESS_KEY: str
-    # S3_FORCE_PATH_STYLE: Optional[bool] = None
+    S3_ACCESS_KEY_ID: str
+    S3_SECRET_ACCESS_KEY: str
+    S3_FORCE_PATH_STYLE: Optional[bool] = None
     # True for MinIO/R2, False for AWS S3, None to auto-detect
 
 
