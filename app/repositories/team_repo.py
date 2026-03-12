@@ -36,10 +36,24 @@ class TeamRepository:
         if not team:
             return None
 
-        team.team_name = team_update.team_name
-        team.base_latitude = team_update.base_latitude
-        team.base_longitude = team_update.base_longitude
-        team.coverage_radius_km = team_update.coverage_radius_km
+        team.team_name = (
+            team_update.team_name if team_update.team_name is not None else team.team_name
+        )
+        team.base_latitude = (
+            team_update.base_latitude
+            if team_update.base_latitude is not None
+            else team.base_latitude
+        )
+        team.base_longitude = (
+            team_update.base_longitude
+            if team_update.base_longitude is not None
+            else team.base_longitude
+        )
+        team.coverage_radius_km = (
+            team_update.coverage_radius_km
+            if team_update.coverage_radius_km is not None
+            else team.coverage_radius_km
+        )
         team.status = team_update.status if team_update.status is not None else team.status
         self.db.add(team)
         await self.db.commit()
