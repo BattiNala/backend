@@ -5,4 +5,7 @@ from app.schemas.issue import IssueType
 
 
 def department_to_issue_type(department: Department) -> IssueType:
+    """
+    Convert a Department object to an IssueType object.
+    """
     return IssueType(issue_type_id=department.department_id, issue_type=department.department_name)
