@@ -103,7 +103,7 @@ async def create_anonymous_issue(
     try:
         async with S3Service(S3Config()) as s3:
             for photo in photos:
-                fd, temp_path = tempfile.mkstemp(suffix=".tmp")
+                fd, temp_path = tempfile.mkstemp(suffix=Path(photo.filename).suffix)
                 os.close(fd)
                 temp_paths.append(temp_path)
 
