@@ -13,6 +13,8 @@ from app.schemas.employee import EmployeeProfile
 
 
 class EmployeeRepository:
+    """Repository for employee-related database operations."""
+
     def __init__(self, db: AsyncSession):
         self.db: AsyncSession = db
 
@@ -24,10 +26,11 @@ class EmployeeRepository:
         return employee
 
     async def get_employee_profile_by_user_id(self, user_id: int) -> dict | None:
+        """Get an employee profile by user ID, including team and department information."""
         stmt = (
             select(Employee)
             .options(
-                joinedload(Employee.teams).joinedload(  # load team
+                joinedload(Employee.team).joinedload(  # load team
                     Team.department
                 )  # load department through team
             )
@@ -40,7 +43,7 @@ class EmployeeRepository:
         if not employee:
             return None
 
-        team: Team = employee.teams
+        team: Team = employee.team
         department: Department = team.department if team else None
 
         return EmployeeProfile(
@@ -51,3 +54,9 @@ class EmployeeRepository:
             department_name=department.department_name if department else None,
             status=employee.current_status,
         )
+
+    async def get_employee_by_user_id(self, user_id: int) -> Employee | None:
+        """Get an employee by their user ID."""
+        stmt = select(Employee).where(Employee.user_id == user_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()

@@ -13,7 +13,7 @@ from app.core.config import settings
 DATABASE_URL = (
     "postgresql+asyncpg://"
     f"{settings.DB_USER}:{settings.DB_PASSWORD}"
-    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
+    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?ssl=disable"
 )
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
