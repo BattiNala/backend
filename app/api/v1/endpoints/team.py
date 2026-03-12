@@ -67,7 +67,21 @@ async def get_teams(
     return TeamList(teams=teams)
 
 
-@team_router.get("/teams/{team_id}")
+@team_router.get(
+    "/teams/{team_id}",
+    response_model=Team,
+    dependencies=[Depends(require_department_admin)],
+    responses={
+        403: {
+            "description": "Access forbidden: Department Admin or Superadmin only",
+            "content": {"application/json": {"example": {"detail": "Not enough permissions"}}},
+        },
+        404: {
+            "description": "Team not found or current user doesn't have access to the team",
+            "content": {"application/json": {"example": {"detail": "Team not found."}}},
+        },
+    },
+)
 async def get_team(
     team_id: int,
     db: AsyncSession = Depends(get_db),
@@ -104,7 +118,7 @@ async def get_team(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this team.",
         )
-    return {"team": team}
+    return team
 
 
 @team_router.post(
