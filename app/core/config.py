@@ -34,5 +34,24 @@ class Settings(BaseSettings):
     S3_FORCE_PATH_STYLE: Optional[bool] = None
     # True for MinIO/R2, False for AWS S3, None to auto-detect
 
+    # Routing
+    OSM_PBF_PATH: str = "kathmandu_valley.osm.pbf"
+    ROUTE_GRID_CELL_SIZE_DEG: float = 0.005
+    ROUTE_GRAPH_CACHE_PATH: str = "route_graph_cache.pkl"
+    ROUTE_MAX_SNAP_DISTANCE_M: float = 5.0
+    ROUTE_RESPONSE_SIMPLIFY_TOLERANCE_M: float = 7.5
+    ROUTE_HIGHWAY_TYPES: list[str] = [
+        "motorway",
+        "trunk",
+        "primary",
+        "secondary",
+        "tertiary",
+        "residential",
+        "service",
+        "unclassified",
+        "living_street",
+        "road",
+    ]
+
 
 settings = Settings()
