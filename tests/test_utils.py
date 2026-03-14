@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from app.algorithms.haversine import haversine
+from app.routing.haversine import haversine
 from app.schemas.geo_location import GeoLocation
 from app.utils.time import utc_to_timezone
 
