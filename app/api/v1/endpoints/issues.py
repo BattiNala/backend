@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models import Issue
+from app.models.citizens import Citizen
 from app.models.user import User
+from app.repositories.citizen_repo import CitizenRepository
 from app.repositories.department_repo import DepartmentRepository
 from app.repositories.issue_repo import IssueRepository
 from app.schemas.issue import (
@@ -22,17 +24,17 @@ from app.schemas.issue import (
     AnonymousIssueCreateResponse,
     IssueCreate,
     IssueCreateResponse,
+    IssueListItem,
+    IssueListResponse,
     IssueTypesList,
 )
 from app.services.s3_service import S3Config, S3Service
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
 from app.utils.time import utc_to_timezone
-from app.utils.user_agent import get_device_type
+from app.utils.validators import ensure_required_user_agent, validate_photos
 
 issue_router = APIRouter()
-
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 def _get_s3_service() -> S3Service:
@@ -48,35 +50,6 @@ async def _safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str]
             status_code=500,
             detail="An error occurred while uploading photos.",
         ) from e
-
-
-def _ensure_required_user_agent(request: Request, required_agent: str) -> None:
-    user_agent = request.headers.get("user-agent")
-    if not user_agent:
-        raise HTTPException(
-            status_code=400,
-            detail="User-Agent header is required to create anonymous issues.",
-        )
-    user_agent_check = get_device_type(user_agent)
-    if user_agent_check != required_agent:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Only {required_agent} user agents are allowed to create anonymous issues.",
-        )
-
-
-def _validate_photos(photos: list[UploadFile]) -> None:
-    if not photos:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one photo is required",
-        )
-    for photo in photos:
-        if photo.content_type not in ALLOWED_IMAGE_TYPES:
-            raise HTTPException(
-                status_code=400,
-                detail="Only JPEG, PNG, and WebP image files are allowed",
-            )
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -149,8 +122,8 @@ async def create_anonymous_issue(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new anonymous issue."""
-    _ensure_required_user_agent(request, "browser")
-    _validate_photos(photos)
+    ensure_required_user_agent(request, "browser")
+    validate_photos(photos)
     issue_create_obj = _parse_issue_create(issue_create, AnonymousIssueCreate)
 
     try:
@@ -207,8 +180,8 @@ async def create_issue(
     user: User = Depends(get_current_user),
 ):
     """Create a new issue with user association."""
-    _ensure_required_user_agent(request, "BattinalaApp")
-    _validate_photos(photos)
+    ensure_required_user_agent(request, "BattinalaApp")
+    validate_photos(photos)
     try:
         issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
 
@@ -217,11 +190,13 @@ async def create_issue(
         attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
+        citizen_repo = CitizenRepository(db)
+        citizen_profile: Citizen = await citizen_repo.get_citizen_by_user_id(user.user_id)
         issue_label = generate_issue_label()
         while await issue_repo.check_issue_label_exists(issue_label):
             issue_label = generate_issue_label()
         new_issue: Issue = await issue_repo.create_issue(
-            issue_create_obj, user.user_id, issue_label, attachment_paths
+            issue_create_obj, citizen_profile.citizen_id, issue_label, attachment_paths
         )
         await db.commit()
         return IssueCreateResponse(
@@ -245,7 +220,21 @@ async def create_issue(
                 pass
 
 
-@issue_router.get("/{issue_id}")
-async def get_issue(issue_id: int):
+@issue_router.get("/my-issues", response_model=IssueListResponse, status_code=status.HTTP_200_OK)
+async def get_my_issues(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Return a list of issues reported by the current user."""
+    issue_repo = IssueRepository(db)
+    citizen_repo = CitizenRepository(db)
+    citizen: Citizen = await citizen_repo.get_citizen_by_user_id(user.user_id)
+    issues: list[IssueListItem] = await issue_repo.get_issues_by_reporter(citizen.citizen_id)
+    return IssueListResponse(items=issues, total=len(issues))
+
+
+@issue_router.get("/{issue_label}", status_code=status.HTTP_200_OK)
+async def get_issue(issue_label: str, db: AsyncSession = Depends(get_db)):
     """Return a placeholder issue detail response."""
-    return {"issue_id": issue_id, "details": {}}
+    issue_repo = IssueRepository(db)
+    issue = await issue_repo.get_issue_by_label(issue_label)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    return issue
