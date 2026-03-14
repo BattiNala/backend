@@ -13,3 +13,11 @@ repos:
     - id: ruff-check
     # Run the formatter.
     - id: ruff-format
+- repo: local
+  hooks:
+    - id: pylint
+      name: pylint
+      entry: uv run pylint
+      language: system
+      types: [python]
+      exclude: ^alembic/
