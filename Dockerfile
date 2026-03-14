@@ -10,7 +10,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:0.10.9 /uv /uvx /bin/
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
+    && apt-get install -y --no-install-recommends build-essential libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./
