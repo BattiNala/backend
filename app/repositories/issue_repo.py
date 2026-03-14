@@ -45,7 +45,13 @@ class IssueRepository:
         await self.db.refresh(new_issue)
         return new_issue
 
-    async def create_issue(self, issue_data: IssueCreate, user_id: int, issue_label: str):
+    async def create_issue(
+        self,
+        issue_data: IssueCreate,
+        user_id: int,
+        issue_label: str,
+        attachment_paths: list[str] = None,
+    ):
         """Create a new issue in the database."""
         new_issue = Issue(
             issue_label=issue_label,
@@ -59,6 +65,7 @@ class IssueRepository:
                 longitude=str(issue_data.longitude),
                 address=issue_data.issue_location,
             ),
+            attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
         await self.db.commit()

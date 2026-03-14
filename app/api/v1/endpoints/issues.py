@@ -4,10 +4,11 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from typing import Type, TypeVar
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
@@ -18,8 +19,9 @@ from app.repositories.department_repo import DepartmentRepository
 from app.repositories.issue_repo import IssueRepository
 from app.schemas.issue import (
     AnonymousIssueCreate,
-    AnonymousIssueResponse,
+    AnonymousIssueCreateResponse,
     IssueCreate,
+    IssueCreateResponse,
     IssueTypesList,
 )
 from app.services.s3_service import S3Config, S3Service
@@ -31,6 +33,21 @@ from app.utils.user_agent import get_device_type
 issue_router = APIRouter()
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+def _get_s3_service() -> S3Service:
+    return S3Service(S3Config())
+
+
+async def _safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str], list[str]]:
+    try:
+        async with _get_s3_service() as s3:
+            return await _upload_photos_to_s3(photos, s3)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while uploading photos.",
+        ) from e
 
 
 def _ensure_required_user_agent(request: Request, required_agent: str) -> None:
@@ -62,10 +79,13 @@ def _validate_photos(photos: list[UploadFile]) -> None:
             )
 
 
-def _parse_anonymous_issue_create(issue_create: str) -> AnonymousIssueCreate:
+T = TypeVar("T", bound=BaseModel)
+
+
+def _parse_issue_create(issue_create: str, schema_cls: Type[T]) -> T:
     try:
         issue_create_data = json.loads(issue_create)
-        return AnonymousIssueCreate(**issue_create_data)
+        return schema_cls(**issue_create_data)
     except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=400,
@@ -110,14 +130,16 @@ async def get_issue_types(db: AsyncSession = Depends(get_db)):
 
 
 @issue_router.get("/")
-def list_issues():
+async def list_issues(db: AsyncSession = Depends(get_db)):
     """Return a placeholder issue list response."""
-    return {"items": []}
+    issue_repo = IssueRepository(db)
+    issues = await issue_repo.list_issues()
+    return {"items": issues, "total": len(issues)}
 
 
 @issue_router.post(
     "/anon-create",
-    response_model=AnonymousIssueResponse,
+    response_model=AnonymousIssueCreateResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_anonymous_issue(
@@ -129,14 +151,12 @@ async def create_anonymous_issue(
     """Create a new anonymous issue."""
     _ensure_required_user_agent(request, "browser")
     _validate_photos(photos)
-    issue_create_obj = _parse_anonymous_issue_create(issue_create)
-
-    attachment_paths: list[str] = []
-    temp_paths: list[str] = []
+    issue_create_obj = _parse_issue_create(issue_create, AnonymousIssueCreate)
 
     try:
-        async with S3Service(S3Config()) as s3:
-            attachment_paths, temp_paths = await _upload_photos_to_s3(photos, s3)
+        attachment_paths: list[str] = []
+        temp_paths: list[str] = []
+        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
 
@@ -152,7 +172,7 @@ async def create_anonymous_issue(
 
         await db.commit()
 
-        return AnonymousIssueResponse(
+        return AnonymousIssueCreateResponse(
             issue_label=new_issue.issue_label,
             status=new_issue.status,
             created_at=str(utc_to_timezone(new_issue.created_at)),
@@ -174,19 +194,55 @@ async def create_anonymous_issue(
                 pass
 
 
-@issue_router.post("/create", status_code=status.HTTP_201_CREATED)
+@issue_router.post(
+    "/create",
+    status_code=status.HTTP_201_CREATED,
+    response_model=IssueCreateResponse,
+)
 async def create_issue(
-    issue_create: IssueCreate,
+    request: Request,
+    photos: list[UploadFile] = File(...),
+    issue_create: str = Form(...),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Create a new issue with user association."""
-    issue_repo = IssueRepository(db)
-    issue_label = generate_issue_label()
-    while await issue_repo.check_issue_label_exists(issue_label):
+    _ensure_required_user_agent(request, "BattinalaApp")
+    _validate_photos(photos)
+    try:
+        issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
+
+        attachment_paths: list[str] = []
+        temp_paths: list[str] = []
+        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
+
+        issue_repo = IssueRepository(db)
         issue_label = generate_issue_label()
-    new_issue: Issue = await issue_repo.create_issue(issue_create, user.user_id, issue_label)
-    return {"message": "Issue created successfully", "issue": new_issue.issue_id}
+        while await issue_repo.check_issue_label_exists(issue_label):
+            issue_label = generate_issue_label()
+        new_issue: Issue = await issue_repo.create_issue(
+            issue_create_obj, user.user_id, issue_label, attachment_paths
+        )
+        await db.commit()
+        return IssueCreateResponse(
+            issue_label=new_issue.issue_label,
+            status=new_issue.status,
+            created_at=str(utc_to_timezone(new_issue.created_at)),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while creating the issue.",
+        ) from e
+    finally:
+        for tmp in temp_paths:
+            try:
+                os.remove(tmp)
+            except FileNotFoundError:
+                pass
 
 
 @issue_router.get("/{issue_id}")
