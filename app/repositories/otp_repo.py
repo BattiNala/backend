@@ -4,9 +4,10 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.otp_code import OtpCode, OtpChannel, OtpPurpose
+from sqlalchemy.orm import selectinload
+
+from app.models.otp_code import OtpChannel, OtpCode, OtpPurpose
 
 
 class OtpRepository:
@@ -37,8 +38,7 @@ class OtpRepository:
             purpose=purpose,
             otp_salt=otp_salt,
             otp_hash=otp_hash,
-            expires_at=datetime.now(timezone.utc)
-            + timedelta(minutes=expires_in_minutes),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=expires_in_minutes),
             resend_available_at=datetime.now(timezone.utc)
             + timedelta(minutes=resend_cooldown_minutes),
         )
@@ -50,9 +50,7 @@ class OtpRepository:
     async def get_otp_code_by_user_id(self, user_id: int) -> OtpCode:
         """Return the OTP record associated with a user, if present."""
         result = await self.db.execute(
-            select(OtpCode)
-            .options(selectinload(OtpCode.user))
-            .where(OtpCode.user_id == user_id)
+            select(OtpCode).options(selectinload(OtpCode.user)).where(OtpCode.user_id == user_id)
         )
         return result.scalars().first()
 
@@ -76,9 +74,7 @@ class OtpRepository:
     async def consume_otp_code(self, otp_id: uuid4):
         """Mark an OTP as consumed and return the updated record."""
         result = await self.db.execute(
-            select(OtpCode)
-            .options(selectinload(OtpCode.user))
-            .where(OtpCode.otp_id == otp_id)
+            select(OtpCode).options(selectinload(OtpCode.user)).where(OtpCode.otp_id == otp_id)
         )
         otp_code = result.scalars().first()
         if otp_code:
