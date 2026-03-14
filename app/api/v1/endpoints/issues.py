@@ -33,7 +33,7 @@ issue_router = APIRouter()
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
-def _ensure_browser_user_agent(request: Request) -> None:
+def _ensure_required_user_agent(request: Request, required_agent: str) -> None:
     user_agent = request.headers.get("user-agent")
     if not user_agent:
         raise HTTPException(
@@ -41,10 +41,10 @@ def _ensure_browser_user_agent(request: Request) -> None:
             detail="User-Agent header is required to create anonymous issues.",
         )
     user_agent_check = get_device_type(user_agent)
-    if user_agent_check != "browser":
+    if user_agent_check != required_agent:
         raise HTTPException(
             status_code=400,
-            detail="Only browser user agents are allowed to create anonymous issues.",
+            detail=f"Only {required_agent} user agents are allowed to create anonymous issues.",
         )
 
 
@@ -127,7 +127,7 @@ async def create_anonymous_issue(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new anonymous issue."""
-    _ensure_browser_user_agent(request)
+    _ensure_required_user_agent(request, "browser")
     _validate_photos(photos)
     issue_create_obj = _parse_anonymous_issue_create(issue_create)
 
