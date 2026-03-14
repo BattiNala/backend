@@ -63,9 +63,13 @@ class IssueCreate(IssueBase):
     issue_location: Optional[str] = None
 
 
-class AnonymousIssueResponse(BaseModel):
-    """Response model for an anonymous issue."""
+class IssueCreateResponse(BaseModel):
+    """Response model for an issue."""
 
     issue_label: str
     status: IssueStatus
     created_at: str
+
+
+class AnonymousIssueCreateResponse(IssueCreateResponse):
+    """Response model for an anonymous issue."""
