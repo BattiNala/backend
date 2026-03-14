@@ -1,2 +1,4 @@
 [MASTER]
 ignore=alembic
+[TYPECHECK]
+extension-pkg-allow-list=time

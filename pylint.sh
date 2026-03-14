@@ -1,1 +1,1 @@
-uv run pylint $(git ls-files '*.py' | grep -v '^alembic/')     
+uv run pylint -j 0 app tests
