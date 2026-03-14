@@ -9,7 +9,7 @@ def get_device_type(user_agent: str) -> str:
         return "unknown"
 
     if is_mobile_app_user_agent(user_agent):
-        return "mobile_app"
+        return "BattinalaApp"
     if is_browser_user_agent(user_agent):
         return "browser"
     if is_mobile_user_agent(user_agent):
