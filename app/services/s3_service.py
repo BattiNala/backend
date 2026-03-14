@@ -33,6 +33,8 @@ from app.core.config import settings
 
 @dataclass(frozen=True)
 class S3Config:
+    """Configuration for S3Service, loaded from environment variables."""
+
     bucket_name: str = settings.S3_BUCKET_NAME
     region_name: str = settings.S3_REGION_NAME
     endpoint_url: str | None = settings.S3_ENDPOINT_URL
@@ -249,6 +251,7 @@ class S3Service:
             return []
 
     async def presign_get(self, object_key: str, expiration: int = 3600) -> str | None:
+        """Generate a presigned URL for downloading an object."""
 
         if self.client is None:
             raise RuntimeError("S3Service not initialized")
