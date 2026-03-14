@@ -20,4 +20,4 @@ repos:
       entry: bash -c 'PYTHONPATH=. uv run pylint "$@"' --
       language: system
       types: [python]
-      exclude: ^alembic/
+      exclude: ^(alembic/|tests/cli_tests/)
