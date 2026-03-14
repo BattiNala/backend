@@ -6,7 +6,7 @@ BASE_URL = "http://localhost:8000"
 ISSUE_URL = f"{BASE_URL}/api/v1/issues/create"
 headers = {
     "accept": "application/json",
-    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo2LCJleHAiOjE3NzM0OTg4NTd9.sI1wazSSTVEaEugs9b9CZCuPguqX7RH-lOXh8cCV30k",  # noqa: E501
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo2LCJleHAiOjE3NzM1MDI1OTN9.YBnMz8_ic2MwmDpW_1RJIWFvAiqC0Zx-Ept78lvyoSE",  # noqa: E501
 }
 useragent = (
     "BattinalaApp/1.0 (Linux; Android 10; SM-N960F Build/QP1A.190711.020; wv) "

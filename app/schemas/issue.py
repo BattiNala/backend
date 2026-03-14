@@ -73,3 +73,20 @@ class IssueCreateResponse(BaseModel):
 
 class AnonymousIssueCreateResponse(IssueCreateResponse):
     """Response model for an anonymous issue."""
+
+
+class IssueListItem(BaseModel):
+    """Schema for listing issues."""
+
+    issue_label: str
+    issue_type: str
+    description: str
+    status: IssueStatus
+    created_at: str
+
+
+class IssueListResponse(BaseModel):
+    """Response model for listing issues."""
+
+    items: list[IssueListItem]
+    total: int
