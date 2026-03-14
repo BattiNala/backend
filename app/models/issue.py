@@ -69,3 +69,9 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
         cascade="all, delete-orphan",
         single_parent=True,
     )
+    attachments = relationship(
+        "Attachment",
+        back_populates="issue",
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )

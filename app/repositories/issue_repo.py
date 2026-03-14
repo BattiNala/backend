@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.models.attachment import Attachment
 from app.models.issue import Issue
 from app.models.issue_location import IssueLocation
 from app.schemas.issue import AnonymousIssueCreate, IssueCreate, IssueStatus
@@ -22,7 +23,9 @@ class IssueRepository:
         result = await self.db.execute(select(Issue).where(Issue.issue_label == issue_label))
         return result.scalars().first() is not None
 
-    async def create_anon_issue(self, issue_data: AnonymousIssueCreate, issue_label: str):
+    async def create_anon_issue(
+        self, issue_data: AnonymousIssueCreate, issue_label: str, attachment_paths: list[str] = None
+    ):
         """Create a new anonymous issue in the database."""
         new_issue = Issue(
             issue_label=issue_label,
@@ -35,6 +38,7 @@ class IssueRepository:
                 longitude=str(issue_data.longitude),
                 address=issue_data.issue_location,
             ),
+            attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
         await self.db.commit()
