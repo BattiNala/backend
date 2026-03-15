@@ -24,8 +24,11 @@ from app.schemas.issue import (
     AnonymousIssueCreateResponse,
     IssueCreate,
     IssueCreateResponse,
+    IssueDetailResponse,
     IssueListItem,
     IssueListResponse,
+    IssuePriority,
+    IssuePriorityOptionsResponse,
     IssueTypesList,
 )
 from app.services.s3_service import S3Config, S3Service
@@ -90,6 +93,18 @@ async def _upload_photos_to_s3(
         if object_key:
             attachment_paths.append(object_key)
     return attachment_paths, temp_paths
+
+
+@issue_router.get(
+    "/issue-priority-options",
+    response_model=IssuePriorityOptionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Issue Priority Options",
+    description="Retrieve a list of available issue priorities.",
+)
+async def get_issue_priority_options():
+    """Return a list of available issue priorities."""
+    return IssuePriorityOptionsResponse(priorities=[priority.value for priority in IssuePriority])
 
 
 @issue_router.get("/get-issue-types", response_model=IssueTypesList)
@@ -227,14 +242,31 @@ async def get_my_issues(db: AsyncSession = Depends(get_db), user: User = Depends
     citizen_repo = CitizenRepository(db)
     citizen: Citizen = await citizen_repo.get_citizen_by_user_id(user.user_id)
     issues: list[IssueListItem] = await issue_repo.get_issues_by_reporter(citizen.citizen_id)
-    return IssueListResponse(items=issues, total=len(issues))
+    return IssueListResponse(issues=issues, total=len(issues))
 
 
-@issue_router.get("/{issue_label}", status_code=status.HTTP_200_OK)
+@issue_router.get(
+    "/{issue_label}", response_model=IssueDetailResponse, status_code=status.HTTP_200_OK
+)
 async def get_issue(issue_label: str, db: AsyncSession = Depends(get_db)):
     """Return a placeholder issue detail response."""
     issue_repo = IssueRepository(db)
     issue = await issue_repo.get_issue_by_label(issue_label)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-    return issue
+    s3 = _get_s3_service()
+    for attachment in issue.attachments:
+        attachment.path = s3.build_s3_url(attachment.path)
+    return IssueDetailResponse(
+        issue_label=issue.issue_label,
+        issue_type=issue.department.department_name if issue.department else "Unknown",
+        description=issue.description,
+        status=issue.status,
+        issue_priority=issue.issue_priority,
+        assigned_to=issue.assignee.name if issue.assignee else None,
+        created_at=str(utc_to_timezone(issue.created_at)),
+        attachments=[attachment.path for attachment in issue.attachments],
+        issue_location=issue.issue_location.address if issue.issue_location else None,
+        latitude=issue.issue_location.latitude if issue.issue_location else None,
+        longitude=issue.issue_location.longitude if issue.issue_location else None,
+    )

@@ -32,6 +32,7 @@ class IssueRepository:
             issue_label=issue_label,
             issue_type=issue_data.issue_type,
             description=issue_data.description,
+            issue_priority=issue_data.issue_priority,
             status=IssueStatus.PENDING_VERIFICATION,
             is_anonymous=True,
             issue_location=IssueLocation(
@@ -58,6 +59,7 @@ class IssueRepository:
             issue_label=issue_label,
             issue_type=issue_data.issue_type,
             description=issue_data.description,
+            issue_priority=issue_data.issue_priority,
             status=issue_data.status,
             is_anonymous=False,
             reporter_id=user_id,
@@ -105,6 +107,7 @@ class IssueRepository:
             .options(joinedload(Issue.attachments))
             .options(joinedload(Issue.department))
             .options(joinedload(Issue.reporter))
+            .options(joinedload(Issue.assignee))
             .where(Issue.issue_label == issue_label)
         )
         result = await self.db.execute(stmt)
@@ -133,6 +136,7 @@ class IssueRepository:
                 issue_type=issue.department.department_name
                 if issue.department
                 else str(issue.issue_type),
+                issue_priority=issue.issue_priority,
                 description=issue.description,
                 status=issue.status,
                 created_at=str(utc_to_timezone(issue.created_at)),
