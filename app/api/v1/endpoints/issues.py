@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Type, TypeVar
 
 import aiofiles
+import aiofiles.os
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,6 +96,16 @@ async def _upload_photos_to_s3(
     return attachment_paths, temp_paths
 
 
+async def delete_temp_files(temp_paths):
+    """Delete temporary files used for photo uploads."""
+    for tmp in temp_paths:
+        try:
+            await aiofiles.os.remove(tmp)
+        except FileNotFoundError:
+            # If the file was already removed, we can ignore this error
+            pass
+
+
 @issue_router.get(
     "/issue-priority-options",
     response_model=IssuePriorityOptionsResponse,
@@ -141,9 +152,9 @@ async def create_anonymous_issue(
     validate_photos(photos)
     issue_create_obj = _parse_issue_create(issue_create, AnonymousIssueCreate)
 
+    attachment_paths: list[str] = []
+    temp_paths: list[str] = []
     try:
-        attachment_paths: list[str] = []
-        temp_paths: list[str] = []
         attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
@@ -175,11 +186,7 @@ async def create_anonymous_issue(
             detail="An error occurred while creating the issue.",
         ) from e
     finally:
-        for temp_path in temp_paths:
-            try:
-                os.remove(temp_path)
-            except FileNotFoundError:
-                pass
+        await delete_temp_files(temp_paths)
 
 
 @issue_router.post(
@@ -197,11 +204,10 @@ async def create_issue(
     """Create a new issue with user association."""
     ensure_required_user_agent(request, "BattinalaApp")
     validate_photos(photos)
+    attachment_paths: list[str] = []
+    temp_paths: list[str] = []
     try:
         issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
-
-        attachment_paths: list[str] = []
-        temp_paths: list[str] = []
         attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
@@ -228,11 +234,7 @@ async def create_issue(
             detail="An error occurred while creating the issue.",
         ) from e
     finally:
-        for tmp in temp_paths:
-            try:
-                os.remove(tmp)
-            except FileNotFoundError:
-                pass
+        await delete_temp_files(temp_paths)
 
 
 @issue_router.get("/my-issues", response_model=IssueListResponse, status_code=status.HTTP_200_OK)
