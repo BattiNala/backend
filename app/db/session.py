@@ -10,15 +10,16 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.config import settings
 
-DATABASE_URL = (
+database_url = (
     "postgresql+asyncpg://"
     f"{settings.DB_USER}:{settings.DB_PASSWORD}"
-    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?ssl=disable"
+    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?ssl=mode={settings.DB_SSLMODE}"
 )
+if settings.DB_CHANNELBINDING:
+    database_url += f"&channel_binding={settings.DB_CHANNELBINDING}"
 
-engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_async_engine(database_url, pool_pre_ping=True)
 
-# SQLAlchemy convention commonly uses this name for async session factory.
 # pylint: disable=invalid-name
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

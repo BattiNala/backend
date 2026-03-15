@@ -30,10 +30,13 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_SSLMODE = os.getenv("DB_SSLMODE")
-DB_CHANNELBINDING = os.getenv("DB_CHANNELBINDING")
+DB_CHANNELBINDING = os.getenv("DB_CHANNELBINDING", "")
 
-DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}?sslmode=disable"
-
+DATABASE_URL = (
+    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}?sslmode={DB_SSLMODE}"
+)
+if DB_CHANNELBINDING:
+    DATABASE_URL += f"&channel_binding={DB_CHANNELBINDING}"
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # other values from the config, defined by the needs of env.py,
