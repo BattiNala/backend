@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "password"
     DB_NAME: str = "battinala_db"
+    DB_SSLMODE: str = "require"
+    DB_CHANNELBINDING: Optional[str] = "require"
 
     JWT_SECRET: str = "change-me"
     JWT_ALG: str = "HS256"

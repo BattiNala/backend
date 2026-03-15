@@ -206,3 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 route_graph_cache.pkl
+
+
+tests/cli_tests/*.png

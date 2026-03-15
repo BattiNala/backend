@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.schemas.issue import IssueStatus
+from app.schemas.issue import IssuePriority, IssueStatus
 
 
 class Issue(Base):  # pylint: disable=too-few-public-methods
@@ -30,6 +30,11 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
         ForeignKey("departments.department_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+    )
+    issue_priority = Column(
+        SQLEnum(IssuePriority, name="issue_priority_enum"),
+        nullable=False,
+        default=IssuePriority.NORMAL,
     )
     description = Column(String(1000), nullable=False)
     status = Column(SQLEnum(IssueStatus, name="issue_status_enum"), nullable=False)

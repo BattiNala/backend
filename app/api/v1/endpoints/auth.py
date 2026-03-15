@@ -5,7 +5,11 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
-from app.core.constants import ACCOUNR_VERIFICATION_SUCCESS_EMAIL, CITIZEN_REGISTER_EMAIL
+from app.core.constants import (
+    ACCOUNR_VERIFICATION_SUCCESS_EMAIL,
+    CITIZEN_REGISTER_EMAIL,
+    RESEND_VERIFICATION_BODY,
+)
 from app.db.session import get_db
 from app.exceptions.auth_expection import (
     InvalidCredentialException,
@@ -27,6 +31,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserLogin,
 )
+from app.schemas.citizen import CitizenProfile
 from app.schemas.otp import OtpChannel, OtpPurpose, OtpVerificationRequest
 from app.services.notification_service import (
     EmailSender,
@@ -218,7 +223,7 @@ async def resend_verification_email(
         otp_code, otp_salt, otp_hash = OtpUtils.handle_otp_generation()
 
         target_user = await user_repo.get_user_with_citizen_profile(current_user.user_id)
-        profile = target_user.citizen_profile if target_user else None
+        profile: CitizenProfile | None = target_user.citizen_profile if target_user else None
 
         if not profile:
             raise ValueError("User profile not found.")
@@ -239,12 +244,7 @@ async def resend_verification_email(
             otp_hash=otp_hash,
         )
 
-        body = (
-            f"Hello {current_user.username},\n\n"
-            f"Use the code {otp_code} to verify your Battinala account.\n\n"
-            f"Best regards,\n"
-            f"Battinala Team"
-        )
+        body = RESEND_VERIFICATION_BODY.format(username=current_user.username, otp_code=otp_code)
 
         await _build_notification_service(
             user_repo=user_repo,

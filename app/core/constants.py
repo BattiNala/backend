@@ -17,3 +17,12 @@ ACCOUNR_VERIFICATION_SUCCESS_EMAIL = (
     "Best regards,\n"
     "Battinala Team"
 )
+
+RESEND_VERIFICATION_BODY = (
+    "Hello {username},\n\n"
+    "We received a request to resend the verification code for your Battinala account. "
+    "Please use the following OTP code to verify your account: {otp_code}\n\n"
+    "If you did not request this, please ignore this email.\n\n"
+    "Best regards,\n"
+    "Battinala Team"
+)
