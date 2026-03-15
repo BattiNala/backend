@@ -1,4 +1,4 @@
 [MASTER]
-ignore=alembic
+ignore=alembic, tests/cli_tests
 [TYPECHECK]
 extension-pkg-allow-list=time

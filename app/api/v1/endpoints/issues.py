@@ -4,68 +4,65 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from typing import Type, TypeVar
 
 import aiofiles
+import aiofiles.os
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models import Issue
+from app.models.citizens import Citizen
 from app.models.user import User
+from app.repositories.citizen_repo import CitizenRepository
 from app.repositories.department_repo import DepartmentRepository
 from app.repositories.issue_repo import IssueRepository
 from app.schemas.issue import (
     AnonymousIssueCreate,
-    AnonymousIssueResponse,
+    AnonymousIssueCreateResponse,
     IssueCreate,
+    IssueCreateResponse,
+    IssueDetailResponse,
+    IssueListItem,
+    IssueListResponse,
+    IssuePriority,
+    IssuePriorityOptionsResponse,
     IssueTypesList,
 )
 from app.services.s3_service import S3Config, S3Service
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
 from app.utils.time import utc_to_timezone
-from app.utils.user_agent import get_device_type
+from app.utils.validators import ensure_required_user_agent, validate_photos
 
 issue_router = APIRouter()
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+def _get_s3_service() -> S3Service:
+    return S3Service(S3Config())
 
 
-def _ensure_browser_user_agent(request: Request) -> None:
-    user_agent = request.headers.get("user-agent")
-    if not user_agent:
+async def _safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str], list[str]]:
+    try:
+        async with _get_s3_service() as s3:
+            return await _upload_photos_to_s3(photos, s3)
+    except Exception as e:
         raise HTTPException(
-            status_code=400,
-            detail="User-Agent header is required to create anonymous issues.",
-        )
-    user_agent_check = get_device_type(user_agent)
-    if user_agent_check != "browser":
-        raise HTTPException(
-            status_code=400,
-            detail="Only browser user agents are allowed to create anonymous issues.",
-        )
+            status_code=500,
+            detail="An error occurred while uploading photos.",
+        ) from e
 
 
-def _validate_photos(photos: list[UploadFile]) -> None:
-    if not photos:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one photo is required",
-        )
-    for photo in photos:
-        if photo.content_type not in ALLOWED_IMAGE_TYPES:
-            raise HTTPException(
-                status_code=400,
-                detail="Only JPEG, PNG, and WebP image files are allowed",
-            )
+T = TypeVar("T", bound=BaseModel)
 
 
-def _parse_anonymous_issue_create(issue_create: str) -> AnonymousIssueCreate:
+def _parse_issue_create(issue_create: str, schema_cls: Type[T]) -> T:
     try:
         issue_create_data = json.loads(issue_create)
-        return AnonymousIssueCreate(**issue_create_data)
+        return schema_cls(**issue_create_data)
     except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=400,
@@ -99,6 +96,28 @@ async def _upload_photos_to_s3(
     return attachment_paths, temp_paths
 
 
+async def delete_temp_files(temp_paths):
+    """Delete temporary files used for photo uploads."""
+    for tmp in temp_paths:
+        try:
+            await aiofiles.os.remove(tmp)
+        except FileNotFoundError:
+            # If the file was already removed, we can ignore this error
+            pass
+
+
+@issue_router.get(
+    "/issue-priority-options",
+    response_model=IssuePriorityOptionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Issue Priority Options",
+    description="Retrieve a list of available issue priorities.",
+)
+async def get_issue_priority_options():
+    """Return a list of available issue priorities."""
+    return IssuePriorityOptionsResponse(priorities=[priority.value for priority in IssuePriority])
+
+
 @issue_router.get("/get-issue-types", response_model=IssueTypesList)
 async def get_issue_types(db: AsyncSession = Depends(get_db)):
     """Return a list of available issue types."""
@@ -110,14 +129,16 @@ async def get_issue_types(db: AsyncSession = Depends(get_db)):
 
 
 @issue_router.get("/")
-def list_issues():
+async def list_issues(db: AsyncSession = Depends(get_db)):
     """Return a placeholder issue list response."""
-    return {"items": []}
+    issue_repo = IssueRepository(db)
+    issues = await issue_repo.list_issues()
+    return {"items": issues, "total": len(issues)}
 
 
 @issue_router.post(
     "/anon-create",
-    response_model=AnonymousIssueResponse,
+    response_model=AnonymousIssueCreateResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_anonymous_issue(
@@ -127,16 +148,14 @@ async def create_anonymous_issue(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new anonymous issue."""
-    _ensure_browser_user_agent(request)
-    _validate_photos(photos)
-    issue_create_obj = _parse_anonymous_issue_create(issue_create)
+    ensure_required_user_agent(request, "browser")
+    validate_photos(photos)
+    issue_create_obj = _parse_issue_create(issue_create, AnonymousIssueCreate)
 
     attachment_paths: list[str] = []
     temp_paths: list[str] = []
-
     try:
-        async with S3Service(S3Config()) as s3:
-            attachment_paths, temp_paths = await _upload_photos_to_s3(photos, s3)
+        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
 
@@ -152,7 +171,7 @@ async def create_anonymous_issue(
 
         await db.commit()
 
-        return AnonymousIssueResponse(
+        return AnonymousIssueCreateResponse(
             issue_label=new_issue.issue_label,
             status=new_issue.status,
             created_at=str(utc_to_timezone(new_issue.created_at)),
@@ -167,29 +186,89 @@ async def create_anonymous_issue(
             detail="An error occurred while creating the issue.",
         ) from e
     finally:
-        for temp_path in temp_paths:
-            try:
-                os.remove(temp_path)
-            except FileNotFoundError:
-                pass
+        await delete_temp_files(temp_paths)
 
 
-@issue_router.post("/create", status_code=status.HTTP_201_CREATED)
+@issue_router.post(
+    "/create",
+    status_code=status.HTTP_201_CREATED,
+    response_model=IssueCreateResponse,
+)
 async def create_issue(
-    issue_create: IssueCreate,
+    request: Request,
+    photos: list[UploadFile] = File(...),
+    issue_create: str = Form(...),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Create a new issue with user association."""
-    issue_repo = IssueRepository(db)
-    issue_label = generate_issue_label()
-    while await issue_repo.check_issue_label_exists(issue_label):
+    ensure_required_user_agent(request, "BattinalaApp")
+    validate_photos(photos)
+    attachment_paths: list[str] = []
+    temp_paths: list[str] = []
+    try:
+        issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
+        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
+
+        issue_repo = IssueRepository(db)
+        citizen_repo = CitizenRepository(db)
+        citizen_profile: Citizen = await citizen_repo.get_citizen_by_user_id(user.user_id)
         issue_label = generate_issue_label()
-    new_issue: Issue = await issue_repo.create_issue(issue_create, user.user_id, issue_label)
-    return {"message": "Issue created successfully", "issue": new_issue.issue_id}
+        while await issue_repo.check_issue_label_exists(issue_label):
+            issue_label = generate_issue_label()
+        new_issue: Issue = await issue_repo.create_issue(
+            issue_create_obj, citizen_profile.citizen_id, issue_label, attachment_paths
+        )
+        await db.commit()
+        return IssueCreateResponse(
+            issue_label=new_issue.issue_label,
+            status=new_issue.status,
+            created_at=str(utc_to_timezone(new_issue.created_at)),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while creating the issue.",
+        ) from e
+    finally:
+        await delete_temp_files(temp_paths)
 
 
-@issue_router.get("/{issue_id}")
-async def get_issue(issue_id: int):
+@issue_router.get("/my-issues", response_model=IssueListResponse, status_code=status.HTTP_200_OK)
+async def get_my_issues(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Return a list of issues reported by the current user."""
+    issue_repo = IssueRepository(db)
+    citizen_repo = CitizenRepository(db)
+    citizen: Citizen = await citizen_repo.get_citizen_by_user_id(user.user_id)
+    issues: list[IssueListItem] = await issue_repo.get_issues_by_reporter(citizen.citizen_id)
+    return IssueListResponse(issues=issues, total=len(issues))
+
+
+@issue_router.get(
+    "/{issue_label}", response_model=IssueDetailResponse, status_code=status.HTTP_200_OK
+)
+async def get_issue(issue_label: str, db: AsyncSession = Depends(get_db)):
     """Return a placeholder issue detail response."""
-    return {"issue_id": issue_id, "details": {}}
+    issue_repo = IssueRepository(db)
+    issue = await issue_repo.get_issue_by_label(issue_label)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    s3 = _get_s3_service()
+    for attachment in issue.attachments:
+        attachment.path = s3.build_s3_url(attachment.path)
+    return IssueDetailResponse(
+        issue_label=issue.issue_label,
+        issue_type=issue.department.department_name if issue.department else "Unknown",
+        description=issue.description,
+        status=issue.status,
+        issue_priority=issue.issue_priority,
+        assigned_to=issue.assignee.name if issue.assignee else None,
+        created_at=str(utc_to_timezone(issue.created_at)),
+        attachments=[attachment.path for attachment in issue.attachments],
+        issue_location=issue.issue_location.address if issue.issue_location else None,
+        latitude=issue.issue_location.latitude if issue.issue_location else None,
+        longitude=issue.issue_location.longitude if issue.issue_location else None,
+    )

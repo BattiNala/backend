@@ -6,6 +6,14 @@ from typing import Optional
 from pydantic import BaseModel, model_validator
 
 
+class IssuePriority(str, Enum):
+    """Priority levels for issues."""
+
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+
+
 class IssueStatus(str, Enum):
     """Lifecycle states for issues."""
 
@@ -42,6 +50,7 @@ class AnonymousIssueCreate(IssueBase):
 
     contact_no: str
     issue_location: Optional[str] = None
+    issue_priority: IssuePriority = IssuePriority.NORMAL
     latitude: float
     longitude: float
 
@@ -59,13 +68,59 @@ class IssueCreate(IssueBase):
 
     status: IssueStatus = IssueStatus.OPEN
     latitude: float
+    issue_priority: IssuePriority = IssuePriority.NORMAL
     longitude: float
     issue_location: Optional[str] = None
 
 
-class AnonymousIssueResponse(BaseModel):
-    """Response model for an anonymous issue."""
+class IssueCreateResponse(BaseModel):
+    """Response model for an issue."""
 
     issue_label: str
     status: IssueStatus
     created_at: str
+
+
+class AnonymousIssueCreateResponse(IssueCreateResponse):
+    """Response model for an anonymous issue."""
+
+
+class IssueListItem(BaseModel):
+    """Schema for listing issues."""
+
+    issue_label: str
+    issue_priority: IssuePriority
+    issue_type: str
+    description: str
+    status: IssueStatus
+    created_at: str
+
+
+class IssueListResponse(BaseModel):
+    """Response model for listing issues."""
+
+    issues: list[IssueListItem]
+    total: int
+
+
+class IssueDetailResponse(BaseModel):
+    """Response model for issue details."""
+
+    issue_label: str
+    issue_type: str
+    issue_priority: IssuePriority
+    description: str
+    status: IssueStatus
+    issue_priority: IssuePriority
+    assigned_to: Optional[str] = None
+    created_at: str
+    attachments: list[str]  # List of attachment URLs
+    issue_location: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class IssuePriorityOptionsResponse(BaseModel):
+    """Response model for issue priority options."""
+
+    priorities: list[IssuePriority]
