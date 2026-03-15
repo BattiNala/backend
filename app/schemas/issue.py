@@ -89,6 +89,7 @@ class IssueListItem(BaseModel):
     """Schema for listing issues."""
 
     issue_label: str
+    issue_priority: IssuePriority
     issue_type: str
     description: str
     status: IssueStatus
@@ -98,7 +99,7 @@ class IssueListItem(BaseModel):
 class IssueListResponse(BaseModel):
     """Response model for listing issues."""
 
-    items: list[IssueListItem]
+    issues: list[IssueListItem]
     total: int
 
 
@@ -107,6 +108,7 @@ class IssueDetailResponse(BaseModel):
 
     issue_label: str
     issue_type: str
+    issue_priority: IssuePriority
     description: str
     status: IssueStatus
     issue_priority: IssuePriority
@@ -116,3 +118,9 @@ class IssueDetailResponse(BaseModel):
     issue_location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+
+
+class IssuePriorityOptionsResponse(BaseModel):
+    """Response model for issue priority options."""
+
+    priorities: list[IssuePriority]
