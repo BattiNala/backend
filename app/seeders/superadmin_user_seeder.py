@@ -2,14 +2,14 @@
 
 import asyncio
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
 from app.models.user import User
+from app.repositories.role_repo import RoleRepository
 from app.repositories.user_repo import UserRepository
 from app.seeders.superadmin_role_seeder import seed_superadmin_role
-from app.repositories.role_repo import RoleRepository
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
