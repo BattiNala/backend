@@ -2,6 +2,8 @@
 Authentication utility functions for password hashing, JWT creation, and decoding.
 """
 
+import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -78,3 +80,10 @@ def decode_refresh_token_or_raise(token: str) -> int:
     if not user_id:
         raise InvalidCredentialException()
     return int(user_id)
+
+
+def generate_random_password(length: int = 12) -> str:
+    """Generate a random password of the specified length."""
+
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    return "".join(secrets.choice(alphabet) for _ in range(length))

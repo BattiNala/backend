@@ -23,6 +23,7 @@ class EmployeeBase(BaseModel):
     email: EmailStr
     phone_number: str = Field(..., max_length=20)
     team_id: Optional[int] = None
+    current_status: EmployeeActivityStatus = EmployeeActivityStatus.AVAILABLE
 
 
 class EmployeeCreate(EmployeeBase):
@@ -59,3 +60,17 @@ class EmployeeProfile(BaseModel):
     team_name: Optional[str]
     department_name: str
     current_status: EmployeeActivityStatus
+
+
+class EmployeeTeamChangeRequest(BaseModel):
+    """Schema for requesting a change in an employee's team assignment."""
+
+    employee_id: int
+    new_team_id: int
+
+
+class EmployeeCreateResponse(BaseModel):
+    """Schema for the response after creating a new employee."""
+
+    message: str
+    employee_id: int
