@@ -62,15 +62,41 @@ class AnonymousIssueCreate(IssueBase):
             raise ValueError("contact_no is required for anonymous issues")
         return values
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "description": "Pothole on Main Street",
+                "issue_type": 1,
+                "issue_priority": "HIGH",
+                "latitude": 40.7128,
+                "longitude": -74.0060,
+                "issue_location": "Main Street near 5th Avenue",
+                "contact_no": "9801234567",
+            }
+        }
+    }
+
 
 class IssueCreate(IssueBase):
     """Schema for creating a new issue."""
 
-    status: IssueStatus = IssueStatus.OPEN
     latitude: float
     issue_priority: IssuePriority = IssuePriority.NORMAL
     longitude: float
     issue_location: Optional[str] = None
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "issue_type": 1,
+                "description": "Example description",
+                "latitude": 27.7172,
+                "longitude": 85.3240,
+                "issue_priority": "NORMAL",
+                "issue_location": "Kathmandu",
+            }
+        }
+    }
 
 
 class IssueCreateResponse(BaseModel):
