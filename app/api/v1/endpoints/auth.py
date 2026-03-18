@@ -1,6 +1,6 @@
 """Authentication endpoints for registration, login, token refresh, and OTP flows."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,7 +76,9 @@ def _resolve_channel_and_target(
     return target, channel
 
 
-@auth_router.post("/citizen-register", response_model=TokenResponse)
+@auth_router.post(
+    "/citizen-register", response_model=CitizenRegisterResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(
     user_data: CitizenRegisterRequest,
     db: AsyncSession = Depends(get_db),
