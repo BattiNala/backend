@@ -18,6 +18,7 @@ from app.db.base import Base
 from app.schemas.issue import IssuePriority, IssueStatus
 
 
+# pylint: disable=duplicate-code
 class Issue(Base):  # pylint: disable=too-few-public-methods
     """Model representing an issue reported by a citizen."""
 
@@ -77,6 +78,12 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
     attachments = relationship(
         "Attachment",
         back_populates="issue",
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
+    reported_issue_reports = relationship(
+        "IssueReport",
+        back_populates="reported_issue",
         cascade="all, delete-orphan",
         single_parent=True,
     )
