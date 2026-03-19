@@ -1,4 +1,4 @@
-# pylint: disable=missing-module-docstring
+"""Tests for utils."""
 
 from datetime import datetime
 

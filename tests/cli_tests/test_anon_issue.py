@@ -1,4 +1,4 @@
-# pylint: disable=missing-module-docstring
+"""Tests for anon issue."""
 
 import asyncio
 

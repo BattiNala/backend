@@ -1,8 +1,6 @@
-"""
-Schemas for geo-location related data models.
-"""
+"""Schemas for geo-location related data models."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GeoLocation(BaseModel):
@@ -10,8 +8,6 @@ class GeoLocation(BaseModel):
 
     latitude: float = Field(..., ge=-90, le=90, description="Latitude coordinate")
     longitude: float = Field(..., ge=-180, le=180, description="Longitude coordinate")
-
-    class Config:  # pylint: disable=too-few-public-methods
-        """Pydantic model configuration for schema examples."""
-
-        json_schema_extra = {"example": {"latitude": 40.7128, "longitude": -74.0060}}
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"latitude": 40.7128, "longitude": -74.0060}}
+    )
