@@ -41,6 +41,8 @@ services:
     image: axllent/mailpit
     container_name: mailpit
     restart: unless-stopped
+    volumes:
+      - mailpit_data:/data
 
     ports:
       - 8025:8025
@@ -54,3 +56,4 @@ services:
 
 volumes:
   postgres_data:
+  mailpit_data:
