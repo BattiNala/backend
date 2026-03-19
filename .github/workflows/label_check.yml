@@ -1,0 +1,33 @@
+name: Require Type Label
+
+on:
+  pull_request:
+    types: [opened, edited, labeled, unlabeled, synchronize]
+
+jobs:
+  check-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR has a type label
+        run: |
+          REQUIRED_LABELS=("enhancement" "bug" "chore" "documentation")
+
+          labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+
+          echo "PR Labels: $labels"
+
+          found=false
+
+          for required in "${REQUIRED_LABELS[@]}"; do
+            if echo "$labels" | grep -q "^$required$"; then
+              found=true
+              break
+            fi
+          done
+
+          if [ "$found" = false ]; then
+            echo "❌ PR must have at least one type label: ${REQUIRED_LABELS[*]}"
+            exit 1
+          fi
+
+          echo "✅ Valid label found"
