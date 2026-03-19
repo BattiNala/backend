@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MIN: int = 60
     REFRESH_TOKEN_EXPIRE_MIN: int = 10080  # 7 days
+    PASSWORD_RESET_TOKEN_EXPIRE_MIN: int = 10
+
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 1025
+    SMTP_FROM_EMAIL: str = "sender@battinala.com"
+    SMTP_USER: Optional[str] = "sender@battinala.com"
+    SMTP_PASS: Optional[str] = "password"
+    SMTP_START_TLS: bool = True
+    SMTP_VALIDATE_CERTS: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
