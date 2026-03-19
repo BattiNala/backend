@@ -8,6 +8,7 @@ from typing import Optional
 
 import aiosmtplib
 
+from app.core.config import settings
 from app.repositories.citizen_repo import CitizenRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.role_repo import RoleRepository
@@ -46,13 +47,13 @@ class EmailSender(BaseNotificationSender):  # pylint: disable=too-few-public-met
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
-        smtp_host: str = "localhost",
-        smtp_port: int = 1025,
-        from_email: str = "sender@battinala.com",
-        smtp_user: Optional[str] = "sender@battinala.com",
-        smtp_pass: Optional[str] = "password",
-        start_tls: bool = True,
-        validate_certs: bool = False,
+        smtp_host: str = settings.SMTP_HOST,
+        smtp_port: int = settings.SMTP_PORT,
+        from_email: str = settings.SMTP_FROM_EMAIL,
+        smtp_user: Optional[str] = settings.SMTP_USER,
+        smtp_pass: Optional[str] = settings.SMTP_PASS,
+        start_tls: bool = settings.SMTP_START_TLS,
+        validate_certs: bool = settings.SMTP_VALIDATE_CERTS,
     ):
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
