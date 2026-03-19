@@ -1,4 +1,4 @@
-# pylint: disable=missing-module-docstring
+"""Tests for logging."""
 
 import logging
 import logging.handlers
