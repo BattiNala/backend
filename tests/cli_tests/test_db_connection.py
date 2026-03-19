@@ -1,4 +1,4 @@
-# pylint: disable=missing-module-docstring
+"""Tests for db connection."""
 
 import asyncio
 import os
