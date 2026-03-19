@@ -47,11 +47,14 @@ class OtpRepository:
         await self.db.refresh(new_otp)
         return new_otp
 
-    async def get_otp_code_by_user_id(self, user_id: int) -> OtpCode:
-        """Return the OTP record associated with a user, if present."""
-        result = await self.db.execute(
-            select(OtpCode).options(selectinload(OtpCode.user)).where(OtpCode.user_id == user_id)
-        )
+    async def get_otp_code_by_user_id(
+        self, user_id: int, purpose: OtpPurpose | None = None
+    ) -> OtpCode:
+        """Return the OTP record associated with a user, optionally filtered by purpose."""
+        stmt = select(OtpCode).options(selectinload(OtpCode.user)).where(OtpCode.user_id == user_id)
+        if purpose:
+            stmt = stmt.where(OtpCode.purpose == purpose)
+        result = await self.db.execute(stmt)
         return result.scalars().first()
 
     async def delete_otp_code(self, otp_id: uuid4):

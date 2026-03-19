@@ -22,6 +22,11 @@ from app.db.base import Base
 from app.schemas.otp import OtpChannel, OtpPurpose
 
 
+def _enum_values(enum_cls):
+    """Persist enum values to Postgres so they match the existing DB enum labels."""
+    return [member.value for member in enum_cls]
+
+
 class OtpCode(Base):  # pylint: disable=too-few-public-methods
     """One-time password request and verification metadata."""
 
@@ -36,7 +41,7 @@ class OtpCode(Base):  # pylint: disable=too-few-public-methods
     )
 
     channel = Column(
-        Enum(OtpChannel, name="otp_channel"),
+        Enum(OtpChannel, name="otp_channel", values_callable=_enum_values),
         nullable=False,
     )
 
@@ -46,7 +51,7 @@ class OtpCode(Base):  # pylint: disable=too-few-public-methods
     )
 
     purpose = Column(
-        Enum(OtpPurpose, name="otp_purpose"),
+        Enum(OtpPurpose, name="otp_purpose", values_callable=_enum_values),
         nullable=False,
     )
 

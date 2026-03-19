@@ -61,6 +61,15 @@ class UserRepository:
             await self.db.refresh(user)
         return user
 
+    async def update_password(self, user_id: int, password_hash: str) -> User:
+        """Update a user's password hash."""
+        user = await self.get_user_by_id(user_id)
+        if user:
+            user.password_hash = password_hash
+            await self.db.commit()
+            await self.db.refresh(user)
+        return user
+
     async def get_user_role_name(self, user_id: int) -> str:
         """Fetch the role name of a user by their ID."""
         user = await self.get_user_by_id(user_id)
