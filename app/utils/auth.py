@@ -20,6 +20,7 @@ SECRET_KEY = settings.JWT_SECRET
 ALGORITHM = settings.JWT_ALG
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MIN
 REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MIN
+PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = settings.PASSWORD_RESET_TOKEN_EXPIRE_MIN
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -58,6 +59,18 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_password_reset_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Create a short-lived JWT for password reset confirmation.
+    """
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
+    )
+    to_encode.update({"exp": expire, "purpose": "password_reset"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
 def decode_token(token: str) -> Dict[str, Any]:
     """
     Decode any JWT. Raises app-level exceptions (not jwt.*).
@@ -76,6 +89,20 @@ def decode_refresh_token_or_raise(token: str) -> int:
     Returns user_id or raises your app exception/HTTPException.
     """
     payload = decode_token(token)
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise InvalidCredentialException()
+    return int(user_id)
+
+
+def decode_password_reset_token_or_raise(token: str) -> int:
+    """
+    Password reset token decode helper.
+    Returns user_id or raises your app exception/HTTPException.
+    """
+    payload = decode_token(token)
+    if payload.get("purpose") != "password_reset":
+        raise InvalidCredentialException()
     user_id = payload.get("user_id")
     if not user_id:
         raise InvalidCredentialException()

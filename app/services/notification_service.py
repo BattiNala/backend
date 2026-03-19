@@ -8,7 +8,9 @@ from typing import Optional
 
 import aiosmtplib
 
+from app.core.config import settings
 from app.repositories.citizen_repo import CitizenRepository
+from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.role_repo import RoleRepository
 from app.repositories.user_repo import UserRepository
 from app.schemas.otp import OtpChannel
@@ -34,9 +36,7 @@ class BaseNotificationSender(ABC):  # pylint: disable=too-few-public-methods
     """Abstract sender interface for notification channels."""
 
     @abstractmethod
-    async def send(
-        self, recipient: NotificationRecipient, subject: str, body: str
-    ) -> None:
+    async def send(self, recipient: NotificationRecipient, subject: str, body: str) -> None:
         """Deliver a message to a recipient via a specific channel."""
 
 
@@ -47,13 +47,13 @@ class EmailSender(BaseNotificationSender):  # pylint: disable=too-few-public-met
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
-        smtp_host: str = "localhost",
-        smtp_port: int = 1025,
-        from_email: str = "sender@battinala.com",
-        smtp_user: Optional[str] = "sender@battinala.com",
-        smtp_pass: Optional[str] = "password",
-        start_tls: bool = True,
-        validate_certs: bool = False,
+        smtp_host: str = settings.SMTP_HOST,
+        smtp_port: int = settings.SMTP_PORT,
+        from_email: str = settings.SMTP_FROM_EMAIL,
+        smtp_user: Optional[str] = settings.SMTP_USER,
+        smtp_pass: Optional[str] = settings.SMTP_PASS,
+        start_tls: bool = settings.SMTP_START_TLS,
+        validate_certs: bool = settings.SMTP_VALIDATE_CERTS,
     ):
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
@@ -63,9 +63,7 @@ class EmailSender(BaseNotificationSender):  # pylint: disable=too-few-public-met
         self.start_tls = start_tls
         self.validate_certs = validate_certs
 
-    async def send(
-        self, recipient: NotificationRecipient, subject: str, body: str
-    ) -> None:
+    async def send(self, recipient: NotificationRecipient, subject: str, body: str) -> None:
         """Send an email notification to the recipient."""
         if not recipient.email:
             print(f"User {recipient.username} has no email. Email not sent.")
@@ -93,9 +91,7 @@ class EmailSender(BaseNotificationSender):  # pylint: disable=too-few-public-met
 class SMSSender(BaseNotificationSender):  # pylint: disable=too-few-public-methods
     """SMS sender placeholder implementation."""
 
-    async def send(
-        self, recipient: NotificationRecipient, subject: str, body: str
-    ) -> None:
+    async def send(self, recipient: NotificationRecipient, subject: str, body: str) -> None:
         """Send an SMS notification to the recipient."""
         if not recipient.phone_number:
             print(f"User {recipient.username} has no phone number. SMS not sent.")
@@ -114,12 +110,14 @@ class NotificationService:
         user_repo: UserRepository,
         role_repo: RoleRepository,
         citizen_repo: CitizenRepository,
+        employee_repo: EmployeeRepository,
         email_sender: EmailSender,
         sms_sender: SMSSender,
     ):
         self.user_repo = user_repo
         self.role_repo = role_repo
         self.citizen_repo = citizen_repo
+        self.employee_repo = employee_repo
         self.senders: dict[OtpChannel, BaseNotificationSender] = {
             OtpChannel.EMAIL: email_sender,
             OtpChannel.SMS: sms_sender,
@@ -132,13 +130,24 @@ class NotificationService:
             return None
 
         citizen = await self.citizen_repo.get_citizen_by_user_id(user_id)
+        if citizen:
+            return NotificationRecipient(
+                user_id=user.user_id,
+                username=user.username,
+                email=citizen.email,
+                phone_number=citizen.phone_number,
+            )
 
-        return NotificationRecipient(
-            user_id=user.user_id,
-            username=user.username,
-            email=getattr(citizen, "email", None),
-            phone_number=getattr(citizen, "phone_number", None),
-        )
+        employee = await self.employee_repo.get_employee_by_user_id(user_id)
+        if employee:
+            return NotificationRecipient(
+                user_id=user.user_id,
+                username=user.username,
+                email=employee.email,
+                phone_number=employee.phone_number,
+            )
+
+        return None
 
     async def send_to_user(
         self,
@@ -178,9 +187,7 @@ class NotificationService:
             await self.senders[OtpChannel.SMS].send(recipient, subject, body)
             return
 
-        print(
-            f"User {recipient.username} has no email or phone number. Notification not sent."
-        )
+        print(f"User {recipient.username} has no email or phone number. Notification not sent.")
 
     async def send_to_role(
         self,
