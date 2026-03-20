@@ -83,7 +83,7 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
     )
     reported_issue_reports = relationship(
         "IssueReport",
-        back_populates="reported_issue",
+        back_populates="issue",
         cascade="all, delete-orphan",
         single_parent=True,
     )
