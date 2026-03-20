@@ -60,7 +60,7 @@ class IssueRepository:
             issue_type=issue_data.issue_type,
             description=issue_data.description,
             issue_priority=issue_data.issue_priority,
-            status=issue_data.status,
+            status=IssueStatus.OPEN,
             is_anonymous=False,
             reporter_id=user_id,
             issue_location=IssueLocation(
