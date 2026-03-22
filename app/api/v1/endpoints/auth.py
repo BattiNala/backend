@@ -6,6 +6,11 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
+from app.api.v1.utils import (
+    build_notification_service,
+    resolve_channel_and_target,
+    resolve_user_contact,
+)
 from app.core.constants import (
     ACCOUNR_VERIFICATION_SUCCESS_EMAIL,
     CITIZEN_REGISTER_EMAIL,
@@ -43,9 +48,7 @@ from app.schemas.auth import (
 from app.schemas.citizen import CitizenProfile
 from app.schemas.otp import OtpChannel, OtpPurpose, OtpVerificationRequest
 from app.services.notification_service import (
-    EmailSender,
     NotificationService,
-    SMSSender,
 )
 from app.utils.auth import (
     create_access_token,
@@ -60,50 +63,6 @@ from app.utils.otp_utils import OtpUtils
 
 auth_router = APIRouter()
 security = HTTPBearer()
-
-
-def _build_notification_service(
-    user_repo: UserRepository,
-    role_repo: RoleRepository,
-    citizen_repo: CitizenRepository,
-    employee_repo: EmployeeRepository,
-) -> NotificationService:
-    """Create a notification service with default email and SMS senders."""
-    return NotificationService(
-        user_repo=user_repo,
-        role_repo=role_repo,
-        citizen_repo=citizen_repo,
-        employee_repo=employee_repo,
-        email_sender=EmailSender(),
-        sms_sender=SMSSender(),
-    )
-
-
-def _resolve_channel_and_target(
-    email: str | None,
-    phone_number: str | None,
-) -> tuple[str | None, OtpChannel]:
-    """Resolve preferred OTP destination and channel."""
-    target = email or phone_number
-    channel = OtpChannel.EMAIL if email else OtpChannel.SMS
-    return target, channel
-
-
-async def _resolve_user_contact(
-    user_id: int,
-    citizen_repo: CitizenRepository,
-    employee_repo: EmployeeRepository,
-) -> tuple[str | None, str | None]:
-    """Resolve email/phone for a user, preferring email when available."""
-    citizen = await citizen_repo.get_citizen_by_user_id(user_id)
-    if citizen:
-        return citizen.email, citizen.phone_number
-
-    employee = await employee_repo.get_employee_by_user_id(user_id)
-    if employee:
-        return employee.email, employee.phone_number
-
-    return None, None
 
 
 async def _create_and_send_password_reset_otp(
@@ -159,7 +118,7 @@ async def _create_signup_otp_and_notify(
 ) -> None:
     """Create a signup OTP and send it to the user's preferred channel."""
     otp_code, otp_salt, otp_hash = OtpUtils.handle_otp_generation()
-    target, channel = _resolve_channel_and_target(
+    target, channel = resolve_channel_and_target(
         user_data.email,
         user_data.phone_number,
     )
@@ -194,7 +153,7 @@ async def register(
         role_repo = RoleRepository(db)
         otp_repo = OtpRepository(db)
         employee_repo = EmployeeRepository(db)
-        notification_service = _build_notification_service(
+        notification_service = build_notification_service(
             user_repo=user_repo,
             role_repo=role_repo,
             citizen_repo=citizen_repo,
@@ -326,7 +285,7 @@ async def resend_verification_email(
         if not profile:
             raise ValueError("User profile not found.")
 
-        target, channel = _resolve_channel_and_target(
+        target, channel = resolve_channel_and_target(
             profile.email,
             profile.phone_number,
         )
@@ -344,7 +303,7 @@ async def resend_verification_email(
 
         body = RESEND_VERIFICATION_BODY.format(username=current_user.username, otp_code=otp_code)
 
-        await _build_notification_service(
+        await build_notification_service(
             user_repo=user_repo,
             role_repo=role_repo,
             citizen_repo=citizen_repo,
@@ -400,7 +359,7 @@ async def verify_user(
         await user_repo.verify_user(current_user.user_id)
         await otp_repo.consume_otp_code(otp_details.otp_id)
 
-        await _build_notification_service(
+        await build_notification_service(
             user_repo=user_repo,
             role_repo=role_repo,
             citizen_repo=citizen_repo,
@@ -436,7 +395,7 @@ async def request_password_reset(
         if not user:
             raise UserNotFoundException()
 
-        email, phone_number = await _resolve_user_contact(user.user_id, citizen_repo, employee_repo)
+        email, phone_number = await resolve_user_contact(user.user_id, citizen_repo, employee_repo)
 
         existing_otp = await otp_repo.get_otp_code_by_user_id(
             user.user_id, purpose=OtpPurpose.RESET_PASSWORD
@@ -449,7 +408,7 @@ async def request_password_reset(
                 raise OtpResendCooldownException(time_remaining)
             await otp_repo.delete_otp_code(existing_otp.otp_id)
 
-        notification_service = _build_notification_service(
+        notification_service = build_notification_service(
             user_repo=user_repo,
             role_repo=role_repo,
             citizen_repo=citizen_repo,
@@ -533,7 +492,7 @@ async def confirm_password_reset(
 
         await user_repo.update_password(user.user_id, get_password_hash(request.new_password))
 
-        await _build_notification_service(
+        await build_notification_service(
             user_repo=user_repo,
             role_repo=role_repo,
             citizen_repo=citizen_repo,

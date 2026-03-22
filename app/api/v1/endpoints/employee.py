@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import require_department_admin
+from app.api.v1.utils import build_notification_service
+from app.core.constants import EMPLOYEE_ACCOUNT_CREATED_EMAIL
 from app.db.session import get_db
 from app.exceptions.auth_expection import UserAlreadyExistsException
 from app.models.employee import Employee
@@ -74,6 +76,18 @@ async def create_employee(
                 current_status=employee_data.current_status,
             )
         )
+        await build_notification_service(
+            user_repo=user_repo,
+            role_repo=role_repo,
+            citizen_repo=None,
+            employee_repo=employee_repo,
+        ).send_to_user_auto(
+            new_user.user_id,
+            subject="Employee Account Created",
+            body=EMPLOYEE_ACCOUNT_CREATED_EMAIL.format(
+                name=employee_data.name, username=employee_data.email
+            ),
+        )
         return EmployeeCreateResponse(
             message="Employee created successfully.",
             employee_id=new_employee.employee_id,
@@ -81,6 +95,7 @@ async def create_employee(
     except UserAlreadyExistsException:
         raise
     except Exception as e:
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while creating the employee: {str(e)}",
