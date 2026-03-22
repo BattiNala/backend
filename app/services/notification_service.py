@@ -128,24 +128,24 @@ class NotificationService:
         user = await self.user_repo.get_user_by_id(user_id)
         if not user:
             return None
-
-        citizen = await self.citizen_repo.get_citizen_by_user_id(user_id)
-        if citizen:
-            return NotificationRecipient(
-                user_id=user.user_id,
-                username=user.username,
-                email=citizen.email,
-                phone_number=citizen.phone_number,
-            )
-
-        employee = await self.employee_repo.get_employee_by_user_id(user_id)
-        if employee:
-            return NotificationRecipient(
-                user_id=user.user_id,
-                username=user.username,
-                email=employee.email,
-                phone_number=employee.phone_number,
-            )
+        if self.citizen_repo:
+            citizen = await self.citizen_repo.get_citizen_by_user_id(user_id)
+            if citizen:
+                return NotificationRecipient(
+                    user_id=user.user_id,
+                    username=user.username,
+                    email=citizen.email,
+                    phone_number=citizen.phone_number,
+                )
+        if self.employee_repo:
+            employee = await self.employee_repo.get_employee_by_user_id(user_id)
+            if employee:
+                return NotificationRecipient(
+                    user_id=user.user_id,
+                    username=user.username,
+                    email=employee.email,
+                    phone_number=employee.phone_number,
+                )
 
         return None
 
