@@ -13,6 +13,7 @@ from app.models.team import Team
 from app.routing.haversine import haversine
 from app.schemas.employee import EmployeeActivityStatus
 from app.schemas.geo_location import GeoLocation
+from app.schemas.issue import IssueStatus
 
 logger = get_logger("tasks.jobs")
 
@@ -93,6 +94,9 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
                 continue
 
             issue.assignee_id = employee.employee_id
+            issue.status = IssueStatus.IN_PROGRESS
+            employee.current_status = EmployeeActivityStatus.BUSY
+            db.add(employee)
             db.add(issue)
             try:
                 await db.commit()
