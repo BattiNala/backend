@@ -240,7 +240,15 @@ async def get_issue_types(db: AsyncSession = Depends(get_db)):
     return IssueTypesList(types=issue_types)
 
 
-@issue_router.get("/")
+@issue_router.get(
+    "/",
+    status_code=status.HTTP_200_OK,
+    summary="List Issues with Filters",
+    description="Retrieve a list of issues with optional filters."
+    " department_admin and staff see issues in their department,"
+    " citizens see their own issues, superadmins see all issues. "
+    " Filters: status, priority, date range.",
+)
 async def list_issues(
     filters: IssueListFilters = Depends(_get_issue_list_filters),
     context: _IssueEndpointContext = Depends(_get_issue_endpoint_context),
