@@ -17,7 +17,12 @@ from app.repositories.department_repo import DepartmentRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.role_repo import RoleRepository
 from app.repositories.user_repo import UserRepository
-from app.schemas.department import DepartmentAdminCreate, DepartmentCreate, DepartmentList
+from app.schemas.department import (
+    DepartmentAdmin,
+    DepartmentAdminCreate,
+    DepartmentCreate,
+    DepartmentList,
+)
 from app.utils.auth import get_password_hash
 
 department_router = APIRouter()
@@ -130,3 +135,18 @@ async def add_department_admin(
         await db.rollback()
         print(f"Error creating department admin: {e}")
         raise HTTPException(status_code=500, detail="Failed to create department admin") from e
+
+
+@department_router.get(
+    "/list-department-admins",
+    response_model=list[DepartmentAdmin],
+    dependencies=[Depends(require_superadmin)],
+    summary="List department admins",
+    description="List all department admins, optionally filtered by department (superadmin only).",
+)
+async def list_department_admins(
+    department_id: int | None = None, db: AsyncSession = Depends(get_db)
+) -> list[DepartmentAdmin]:
+    """List department admins, optionally filtered by department."""
+    department_repo = DepartmentRepository(db)
+    return await department_repo.list_department_admins(department_id)
