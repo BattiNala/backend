@@ -33,3 +33,10 @@ class InvalidCredentialException(HTTPException):
 
     def __init__(self, detail: str = "Invalid username or password"):
         super().__init__(status_code=401, detail=detail)
+
+
+class UserNotFoundException(HTTPException):
+    """Exception raised when a user is not found."""
+
+    def __init__(self, detail: str = "User not found"):
+        super().__init__(status_code=404, detail=detail)

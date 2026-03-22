@@ -112,5 +112,18 @@ def decode_password_reset_token_or_raise(token: str) -> int:
 def generate_random_password(length: int = 12) -> str:
     """Generate a random password of the specified length."""
 
-    alphabet = string.ascii_letters + string.digits + string.punctuation
-    return "".join(secrets.choice(alphabet) for _ in range(length))
+    if length <= 0:
+        return ""
+
+    required_charsets = [string.ascii_lowercase, string.ascii_uppercase, string.digits]
+    alphabet = "".join(required_charsets) + string.punctuation
+
+    password_chars = []
+    if length >= len(required_charsets):
+        password_chars.extend(secrets.choice(charset) for charset in required_charsets)
+
+    remaining_length = length - len(password_chars)
+    password_chars.extend(secrets.choice(alphabet) for _ in range(remaining_length))
+    secrets.SystemRandom().shuffle(password_chars)
+
+    return "".join(password_chars)

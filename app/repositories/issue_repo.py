@@ -2,6 +2,9 @@
 Issue repository for handling database operations related to issues.
 """
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -9,8 +12,27 @@ from sqlalchemy.orm import joinedload
 from app.models.attachment import Attachment
 from app.models.issue import Issue
 from app.models.issue_location import IssueLocation
-from app.schemas.issue import AnonymousIssueCreate, IssueCreate, IssueListItem, IssueStatus
+from app.schemas.issue import (
+    AnonymousIssueCreate,
+    IssueCreate,
+    IssueListItem,
+    IssuePriority,
+    IssueStatus,
+)
 from app.utils.time import utc_to_timezone
+
+
+@dataclass(slots=True)
+class IssueListFilters:
+    """Optional filters for listing issues."""
+
+    status: IssueStatus | None = None
+    priority: IssuePriority | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    department_id: int | None = None
+    assignee_id: int | None = None
+    reporter_id: int | None = None
 
 
 class IssueRepository:
@@ -43,7 +65,7 @@ class IssueRepository:
             attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_issue)
         return new_issue
 
@@ -71,7 +93,7 @@ class IssueRepository:
             attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_issue)
         return new_issue
 
@@ -117,10 +139,47 @@ class IssueRepository:
             return None
         return issue
 
-    async def list_issues(self) -> list[Issue]:
-        """List all issues."""
-        result = await self.db.execute(select(Issue))
-        return result.scalars().all()
+    async def update_issue_status(self, issue: Issue, status: IssueStatus) -> Issue:
+        """Update the status for an issue."""
+        issue.status = status
+        self.db.add(issue)
+        await self.db.commit()
+        await self.db.refresh(issue)
+        return issue
+
+    async def list_issues(self, filters: IssueListFilters | None = None) -> list[IssueListItem]:
+        """List issues with optional filters."""
+        filters = filters or IssueListFilters()
+        stmt = select(Issue).options(joinedload(Issue.department))
+        if filters.department_id is not None:
+            stmt = stmt.where(Issue.issue_type == filters.department_id)
+        if filters.assignee_id is not None:
+            stmt = stmt.where(Issue.assignee_id == filters.assignee_id)
+        if filters.reporter_id is not None:
+            stmt = stmt.where(Issue.reporter_id == filters.reporter_id)
+        if filters.status is not None:
+            stmt = stmt.where(Issue.status == filters.status)
+        if filters.priority is not None:
+            stmt = stmt.where(Issue.issue_priority == filters.priority)
+        if filters.date_from is not None:
+            stmt = stmt.where(Issue.created_at >= filters.date_from)
+        if filters.date_to is not None:
+            stmt = stmt.where(Issue.created_at <= filters.date_to)
+        result = await self.db.execute(stmt)
+        selected_issues = result.scalars().all()
+        return [
+            IssueListItem(
+                issue_label=issue.issue_label,
+                issue_type=issue.department.department_name
+                if issue.department
+                else str(issue.issue_type),
+                issue_priority=issue.issue_priority,
+                description=issue.description,
+                status=issue.status,
+                created_at=str(utc_to_timezone(issue.created_at)),
+            )
+            for issue in selected_issues
+        ]
 
     async def get_issues_by_reporter(self, reporter_id: int) -> list[IssueListItem]:
         """List all issues reported by a specific user."""

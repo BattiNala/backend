@@ -1,7 +1,7 @@
 """Authentication endpoints for registration, login, token refresh, and OTP flows."""
 
 import aiosmtplib
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from app.db.session import get_db
 from app.exceptions.auth_expection import (
     InvalidCredentialException,
     UserAlreadyExistsException,
+    UserNotFoundException,
 )
 from app.exceptions.otp_exception import OtpResendCooldownException
 from app.models.citizens import Citizen
@@ -433,7 +434,7 @@ async def request_password_reset(
 
         user = await user_repo.get_user_by_username(request.username)
         if not user:
-            raise ValueError("User not found.")
+            raise UserNotFoundException()
 
         email, phone_number = await _resolve_user_contact(user.user_id, citizen_repo, employee_repo)
 
@@ -466,6 +467,8 @@ async def request_password_reset(
 
     except OtpResendCooldownException:
         raise
+    except UserNotFoundException:
+        raise
     except Exception as e:
         await db.rollback()
         print(f"Error during password reset request: {e}")
@@ -484,13 +487,13 @@ async def verify_password_reset(
 
         user = await user_repo.get_user_by_username(request.username)
         if not user:
-            raise ValueError("User not found.")
+            raise UserNotFoundException()
 
         otp_details = await otp_repo.get_otp_code_by_user_id(
             user.user_id, purpose=OtpPurpose.RESET_PASSWORD
         )
         if not otp_details:
-            raise ValueError("OTP not found.")
+            raise HTTPException(status_code=404, detail="OTP not found.")
 
         if not OtpUtils.verify_otp(
             request.code,

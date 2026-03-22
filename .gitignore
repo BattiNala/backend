@@ -211,3 +211,5 @@ route_graph_cache.pkl
 tests/cli_tests/*.png
 API_DOCS.md
 openapi.json
+employees.csv
+citizen_credentials.csv
