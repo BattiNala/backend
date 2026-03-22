@@ -43,3 +43,11 @@ PASSWORD_RESET_SUCCESS_EMAIL = (
     "Best regards,\n"
     "Battinala Team"
 )
+
+EMPLOYEE_ACCOUNT_CREATED_EMAIL = (
+    "Hello {name},\n\n"
+    "An employee account has been created for you in Battinala. "
+    "Your username is {username} and changing your password is required on first login.\n\n"
+    "Best regards,\n"
+    "Battinala Team"
+)
