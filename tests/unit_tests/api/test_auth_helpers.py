@@ -4,10 +4,10 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from app.api.v1.endpoints.auth import (
-    _build_notification_service,
-    _resolve_channel_and_target,
-    _resolve_user_contact,
+from app.api.v1.utils import (
+    build_notification_service,
+    resolve_channel_and_target,
+    resolve_user_contact,
 )
 from app.schemas.otp import OtpChannel
 from app.services.notification_service import EmailSender, NotificationService, SMSSender
@@ -15,7 +15,7 @@ from app.services.notification_service import EmailSender, NotificationService, 
 
 def test_build_notification_service_wires_expected_sender_types():
     """Test build notification service wires expected sender types."""
-    service = _build_notification_service(
+    service = build_notification_service(
         user_repo=SimpleNamespace(),
         role_repo=SimpleNamespace(),
         citizen_repo=SimpleNamespace(),
@@ -29,11 +29,11 @@ def test_build_notification_service_wires_expected_sender_types():
 
 def test_resolve_channel_and_target_prefers_email_then_sms():
     """Test resolve channel and target prefers email then sms."""
-    assert _resolve_channel_and_target("a@example.com", "9800") == (
+    assert resolve_channel_and_target("a@example.com", "9800") == (
         "a@example.com",
         OtpChannel.EMAIL,
     )
-    assert _resolve_channel_and_target(None, "9800") == ("9800", OtpChannel.SMS)
+    assert resolve_channel_and_target(None, "9800") == ("9800", OtpChannel.SMS)
 
 
 def test_resolve_user_contact_prefers_citizen_then_employee():
@@ -45,7 +45,7 @@ def test_resolve_user_contact_prefers_citizen_then_employee():
     )
     employee_repo = SimpleNamespace(get_employee_by_user_id=AsyncMock(return_value=None))
 
-    assert asyncio.run(_resolve_user_contact(1, citizen_repo, employee_repo)) == (
+    assert asyncio.run(resolve_user_contact(1, citizen_repo, employee_repo)) == (
         "citizen@example.com",
         "9800",
     )
@@ -55,7 +55,7 @@ def test_resolve_user_contact_prefers_citizen_then_employee():
         return_value=SimpleNamespace(email="employee@example.com", phone_number="9811")
     )
 
-    assert asyncio.run(_resolve_user_contact(2, citizen_repo, employee_repo)) == (
+    assert asyncio.run(resolve_user_contact(2, citizen_repo, employee_repo)) == (
         "employee@example.com",
         "9811",
     )
