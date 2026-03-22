@@ -30,18 +30,24 @@ class Employee(Base):  # pylint: disable=too-few-public-methods
         nullable=True,
         index=True,
     )
+    department_id = Column(
+        Integer,
+        ForeignKey("departments.department_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     current_status = Column(
         sql_enum(ActivityStatus, name="activity_status_enum"),
         nullable=False,
         default=ActivityStatus.AVAILABLE,
     )
-    teams = relationship(
+    team = relationship(
         "Team",
         back_populates="members",
         cascade="all, delete",
     )
     user = relationship("User", back_populates="employee_profile", uselist=False)
-
+    department = relationship("Department", back_populates="employees", cascade="all, delete")
     assigned_issues = relationship(
         "Issue",
         back_populates="assignee",

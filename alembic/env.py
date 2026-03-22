@@ -1,13 +1,12 @@
-from logging.config import fileConfig
 import os
+from logging.config import fileConfig
 
 from dotenv import load_dotenv
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from app.models import *  # noqa
 from app.db.base import Base
+from app.models import *  # noqa
 
 load_dotenv()
 
@@ -29,16 +28,14 @@ config = context.config
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
+DB_PORT = os.getenv("DB_PORT", "5432")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_SSLMODE = os.getenv("DB_SSLMODE")
-DB_CHANNELBINDING = os.getenv("DB_CHANNELBINDING")
+DB_CHANNELBINDING = os.getenv("DB_CHANNELBINDING", "")
 
-DATABASE_URL = (
-    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}"
-    f"@{DB_HOST}/{DB_NAME}"
-    f"?sslmode={DB_SSLMODE}&channel_binding={DB_CHANNELBINDING}"
-)
-
+DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode={DB_SSLMODE}"
+if DB_CHANNELBINDING:
+    DATABASE_URL += f"&channel_binding={DB_CHANNELBINDING}"
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # other values from the config, defined by the needs of env.py,

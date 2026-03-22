@@ -2,8 +2,11 @@
 Authentication utility functions for password hashing, JWT creation, and decoding.
 """
 
+import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
+
 import jwt
 from passlib.context import CryptContext
 
@@ -17,6 +20,7 @@ SECRET_KEY = settings.JWT_SECRET
 ALGORITHM = settings.JWT_ALG
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MIN
 REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MIN
+PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = settings.PASSWORD_RESET_TOKEN_EXPIRE_MIN
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -55,6 +59,18 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_password_reset_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Create a short-lived JWT for password reset confirmation.
+    """
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
+    )
+    to_encode.update({"exp": expire, "purpose": "password_reset"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
 def decode_token(token: str) -> Dict[str, Any]:
     """
     Decode any JWT. Raises app-level exceptions (not jwt.*).
@@ -77,3 +93,37 @@ def decode_refresh_token_or_raise(token: str) -> int:
     if not user_id:
         raise InvalidCredentialException()
     return int(user_id)
+
+
+def decode_password_reset_token_or_raise(token: str) -> int:
+    """
+    Password reset token decode helper.
+    Returns user_id or raises your app exception/HTTPException.
+    """
+    payload = decode_token(token)
+    if payload.get("purpose") != "password_reset":
+        raise InvalidCredentialException()
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise InvalidCredentialException()
+    return int(user_id)
+
+
+def generate_random_password(length: int = 12) -> str:
+    """Generate a random password of the specified length."""
+
+    if length <= 0:
+        return ""
+
+    required_charsets = [string.ascii_lowercase, string.ascii_uppercase, string.digits]
+    alphabet = "".join(required_charsets) + string.punctuation
+
+    password_chars = []
+    if length >= len(required_charsets):
+        password_chars.extend(secrets.choice(charset) for charset in required_charsets)
+
+    remaining_length = length - len(password_chars)
+    password_chars.extend(secrets.choice(alphabet) for _ in range(remaining_length))
+    secrets.SystemRandom().shuffle(password_chars)
+
+    return "".join(password_chars)

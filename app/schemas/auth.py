@@ -66,6 +66,33 @@ class CitizenRegisterResponse(TokenResponse):
     is_verified: bool = Field(..., description="Indicates if the user's email is verified")
 
 
+# Password reset flows
+class PasswordResetRequest(BaseModel):
+    """Request a password reset OTP via email or phone."""
+
+    username: str = Field(..., max_length=50)
+
+
+class PasswordResetVerifyRequest(BaseModel):
+    """Verify a password reset OTP and return a reset token."""
+
+    username: str = Field(..., max_length=50)
+    code: str
+
+
+class PasswordResetVerifyResponse(BaseModel):
+    """Response containing a short-lived reset token."""
+
+    reset_token: str
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Confirm password reset using the reset token."""
+
+    reset_token: str
+    new_password: str = Field(..., min_length=6)
+
+
 # class JwtPayload(BaseModel):
 #     user_id: int
 #     role_name: str

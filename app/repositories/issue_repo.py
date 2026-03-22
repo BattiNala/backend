@@ -2,13 +2,37 @@
 Issue repository for handling database operations related to issues.
 """
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.models.attachment import Attachment
 from app.models.issue import Issue
 from app.models.issue_location import IssueLocation
-from app.schemas.issue import AnonymousIssueCreate, IssueCreate, IssueStatus
+from app.schemas.issue import (
+    AnonymousIssueCreate,
+    IssueCreate,
+    IssueListItem,
+    IssuePriority,
+    IssueStatus,
+)
+from app.utils.time import utc_to_timezone
+
+
+@dataclass(slots=True)
+class IssueListFilters:
+    """Optional filters for listing issues."""
+
+    status: IssueStatus | None = None
+    priority: IssuePriority | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    department_id: int | None = None
+    assignee_id: int | None = None
+    reporter_id: int | None = None
 
 
 class IssueRepository:
@@ -22,12 +46,15 @@ class IssueRepository:
         result = await self.db.execute(select(Issue).where(Issue.issue_label == issue_label))
         return result.scalars().first() is not None
 
-    async def create_anon_issue(self, issue_data: AnonymousIssueCreate, issue_label: str):
+    async def create_anon_issue(
+        self, issue_data: AnonymousIssueCreate, issue_label: str, attachment_paths: list[str] = None
+    ):
         """Create a new anonymous issue in the database."""
         new_issue = Issue(
             issue_label=issue_label,
             issue_type=issue_data.issue_type,
             description=issue_data.description,
+            issue_priority=issue_data.issue_priority,
             status=IssueStatus.PENDING_VERIFICATION,
             is_anonymous=True,
             issue_location=IssueLocation(
@@ -35,19 +62,27 @@ class IssueRepository:
                 longitude=str(issue_data.longitude),
                 address=issue_data.issue_location,
             ),
+            attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_issue)
         return new_issue
 
-    async def create_issue(self, issue_data: IssueCreate, user_id: int, issue_label: str):
+    async def create_issue(
+        self,
+        issue_data: IssueCreate,
+        user_id: int,
+        issue_label: str,
+        attachment_paths: list[str] = None,
+    ):
         """Create a new issue in the database."""
         new_issue = Issue(
             issue_label=issue_label,
             issue_type=issue_data.issue_type,
             description=issue_data.description,
-            status=issue_data.status,
+            issue_priority=issue_data.issue_priority,
+            status=IssueStatus.OPEN,
             is_anonymous=False,
             reporter_id=user_id,
             issue_location=IssueLocation(
@@ -55,9 +90,10 @@ class IssueRepository:
                 longitude=str(issue_data.longitude),
                 address=issue_data.issue_location,
             ),
+            attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_issue)
         return new_issue
 
@@ -90,6 +126,10 @@ class IssueRepository:
         stmt = (
             select(Issue)
             .options(joinedload(Issue.issue_location))
+            .options(joinedload(Issue.attachments))
+            .options(joinedload(Issue.department))
+            .options(joinedload(Issue.reporter))
+            .options(joinedload(Issue.assignee))
             .where(Issue.issue_label == issue_label)
         )
         result = await self.db.execute(stmt)
@@ -99,7 +139,66 @@ class IssueRepository:
             return None
         return issue
 
-    async def list_issues(self):
-        """List all issues."""
-        result = await self.db.execute(select(Issue))
-        return result.scalars().all()
+    async def update_issue_status(self, issue: Issue, status: IssueStatus) -> Issue:
+        """Update the status for an issue."""
+        issue.status = status
+        self.db.add(issue)
+        await self.db.commit()
+        await self.db.refresh(issue)
+        return issue
+
+    async def list_issues(self, filters: IssueListFilters | None = None) -> list[IssueListItem]:
+        """List issues with optional filters."""
+        filters = filters or IssueListFilters()
+        stmt = select(Issue).options(joinedload(Issue.department))
+        if filters.department_id is not None:
+            stmt = stmt.where(Issue.issue_type == filters.department_id)
+        if filters.assignee_id is not None:
+            stmt = stmt.where(Issue.assignee_id == filters.assignee_id)
+        if filters.reporter_id is not None:
+            stmt = stmt.where(Issue.reporter_id == filters.reporter_id)
+        if filters.status is not None:
+            stmt = stmt.where(Issue.status == filters.status)
+        if filters.priority is not None:
+            stmt = stmt.where(Issue.issue_priority == filters.priority)
+        if filters.date_from is not None:
+            stmt = stmt.where(Issue.created_at >= filters.date_from)
+        if filters.date_to is not None:
+            stmt = stmt.where(Issue.created_at <= filters.date_to)
+        result = await self.db.execute(stmt)
+        selected_issues = result.scalars().all()
+        return [
+            IssueListItem(
+                issue_label=issue.issue_label,
+                issue_type=issue.department.department_name
+                if issue.department
+                else str(issue.issue_type),
+                issue_priority=issue.issue_priority,
+                description=issue.description,
+                status=issue.status,
+                created_at=str(utc_to_timezone(issue.created_at)),
+            )
+            for issue in selected_issues
+        ]
+
+    async def get_issues_by_reporter(self, reporter_id: int) -> list[IssueListItem]:
+        """List all issues reported by a specific user."""
+        result = await self.db.execute(
+            select(Issue)
+            .options(joinedload(Issue.department))
+            .where(Issue.reporter_id == reporter_id)
+        )
+        issues = result.scalars().all()
+        return [
+            IssueListItem(
+                issue_label=issue.issue_label,
+                issue_type=issue.department.department_name
+                if issue.department
+                else str(issue.issue_type),
+                issue_priority=issue.issue_priority,
+                description=issue.description,
+                status=issue.status,
+                created_at=str(utc_to_timezone(issue.created_at)),
+            )
+            for issue in issues
+        ]

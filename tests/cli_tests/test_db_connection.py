@@ -1,7 +1,8 @@
-# pylint: disable=missing-module-docstring
+"""Tests for db connection."""
 
-import os
 import asyncio
+import os
+
 import asyncpg
 from dotenv import load_dotenv
 

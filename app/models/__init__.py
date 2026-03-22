@@ -10,4 +10,5 @@ from .employee import Employee
 from .otp_code import OtpCode
 from .issue import Issue
 from .issue_location import IssueLocation
-from .department_admin import DepartmentAdmin
+from .attachment import Attachment
+from .issue_reports import IssueReport

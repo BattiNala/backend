@@ -3,7 +3,15 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+
+class IssuePriority(str, Enum):
+    """Priority levels for issues."""
+
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
 
 
 class IssueStatus(str, Enum):
@@ -42,6 +50,7 @@ class AnonymousIssueCreate(IssueBase):
 
     contact_no: str
     issue_location: Optional[str] = None
+    issue_priority: IssuePriority = IssuePriority.NORMAL
     latitude: float
     longitude: float
 
@@ -53,19 +62,105 @@ class AnonymousIssueCreate(IssueBase):
             raise ValueError("contact_no is required for anonymous issues")
         return values
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "description": "Pothole on Main Street",
+                "issue_type": 1,
+                "issue_priority": "HIGH",
+                "latitude": 40.7128,
+                "longitude": -74.0060,
+                "issue_location": "Main Street near 5th Avenue",
+                "contact_no": "9801234567",
+            }
+        }
+    }
+
 
 class IssueCreate(IssueBase):
     """Schema for creating a new issue."""
 
-    status: IssueStatus = IssueStatus.OPEN
     latitude: float
+    issue_priority: IssuePriority = IssuePriority.NORMAL
     longitude: float
     issue_location: Optional[str] = None
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "issue_type": 1,
+                "description": "Example description",
+                "latitude": 27.7172,
+                "longitude": 85.3240,
+                "issue_priority": "NORMAL",
+                "issue_location": "Kathmandu",
+            }
+        }
+    }
 
-class AnonymousIssueResponse(BaseModel):
-    """Response model for an anonymous issue."""
+
+class IssueCreateResponse(BaseModel):
+    """Response model for an issue."""
 
     issue_label: str
     status: IssueStatus
     created_at: str
+
+
+class AnonymousIssueCreateResponse(IssueCreateResponse):
+    """Response model for an anonymous issue."""
+
+
+class IssueListItem(BaseModel):
+    """Schema for listing issues."""
+
+    issue_label: str
+    issue_priority: IssuePriority
+    issue_type: str
+    description: str
+    status: IssueStatus
+    created_at: str
+
+
+class IssueListResponse(BaseModel):
+    """Response model for listing issues."""
+
+    issues: list[IssueListItem]
+    total: int
+
+
+class IssueDetailResponse(BaseModel):
+    """Response model for issue details."""
+
+    issue_label: str
+    issue_type: str
+    issue_priority: IssuePriority
+    description: str
+    status: IssueStatus
+    issue_priority: IssuePriority
+    assigned_to: Optional[str] = None
+    created_at: str
+    attachments: list[str]  # List of attachment URLs
+    issue_location: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class IssueStatusUpdate(BaseModel):
+    """Schema for updating an issue status."""
+
+    issue_label: str
+    status: IssueStatus
+
+
+class IssueReportRequest(BaseModel):
+    """Schema for reporting a false issue."""
+
+    issue_label: str
+    reason: str = Field(..., min_length=30)
+
+
+class IssuePriorityOptionsResponse(BaseModel):
+    """Response model for issue priority options."""
+
+    priorities: list[IssuePriority]

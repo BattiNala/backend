@@ -17,3 +17,29 @@ ACCOUNR_VERIFICATION_SUCCESS_EMAIL = (
     "Best regards,\n"
     "Battinala Team"
 )
+
+RESEND_VERIFICATION_BODY = (
+    "Hello {username},\n\n"
+    "We received a request to resend the verification code for your Battinala account. "
+    "Please use the following OTP code to verify your account: {otp_code}\n\n"
+    "If you did not request this, please ignore this email.\n\n"
+    "Best regards,\n"
+    "Battinala Team"
+)
+
+PASSWORD_RESET_EMAIL = (
+    "Hello {username},\n\n"
+    "We received a request to reset your Battinala password. "
+    "Use the following OTP code to continue: {otp_code}\n\n"
+    "If you did not request this, please ignore this message.\n\n"
+    "Best regards,\n"
+    "Battinala Team"
+)
+
+PASSWORD_RESET_SUCCESS_EMAIL = (
+    "Hello {username},\n\n"
+    "Your Battinala password has been updated successfully.\n\n"
+    "If you did not perform this action, please contact support immediately.\n\n"
+    "Best regards,\n"
+    "Battinala Team"
+)

@@ -13,12 +13,11 @@ from app.core.config import settings
 DATABASE_URL = (
     "postgresql+asyncpg://"
     f"{settings.DB_USER}:{settings.DB_PASSWORD}"
-    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
+    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?ssl={settings.DB_SSLMODE}"
 )
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 
-# SQLAlchemy convention commonly uses this name for async session factory.
 # pylint: disable=invalid-name
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
