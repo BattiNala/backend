@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+from app.schemas.issue import IssueStatus
 from app.tasks import jobs
 
 
@@ -78,6 +79,7 @@ def test_assign_issue_to_nearest_employee_logs_successful_assignment(monkeypatch
         issue_label="ISS-17",
         assignee_id=None,
         issue_type=4,
+        status=IssueStatus.OPEN,
         issue_location=SimpleNamespace(latitude="27.7000", longitude="85.3000"),
     )
     team = SimpleNamespace(
@@ -86,7 +88,7 @@ def test_assign_issue_to_nearest_employee_logs_successful_assignment(monkeypatch
         base_latitude=27.7000,
         base_longitude=85.3000,
     )
-    employee = SimpleNamespace(employee_id=12)
+    employee = SimpleNamespace(employee_id=12, current_status=None)
     session = _FakeSession([issue, [team], employee])
     info = Mock()
 
@@ -99,7 +101,9 @@ def test_assign_issue_to_nearest_employee_logs_successful_assignment(monkeypatch
     asyncio.run(jobs.assign_issue_to_nearest_employee(issue.issue_id))
 
     assert issue.assignee_id == employee.employee_id
-    assert session.added == [issue]
+    assert issue.status == IssueStatus.IN_PROGRESS
+    assert employee.current_status == jobs.EmployeeActivityStatus.BUSY
+    assert session.added == [employee, issue]
     assert session.committed is True
     assert session.rolled_back is False
     info.assert_any_call(
@@ -122,6 +126,7 @@ def test_assign_issue_to_nearest_employee_logs_pending_when_no_employee(monkeypa
         issue_label="ISS-18",
         assignee_id=None,
         issue_type=5,
+        status=IssueStatus.OPEN,
         issue_location=SimpleNamespace(latitude="27.7100", longitude="85.3100"),
     )
     team = SimpleNamespace(
@@ -142,6 +147,7 @@ def test_assign_issue_to_nearest_employee_logs_pending_when_no_employee(monkeypa
     asyncio.run(jobs.assign_issue_to_nearest_employee(issue.issue_id))
 
     assert issue.assignee_id is None
+    assert issue.status == IssueStatus.OPEN
     assert not session.added
     assert session.committed is False
     info.assert_any_call(

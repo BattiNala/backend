@@ -13,16 +13,16 @@ class _FakeSession:
 
     def __init__(self):
         self.added = []
-        self.commits = 0
+        self.flushes = 0
         self.refreshes = []
 
     def add(self, obj):
         """Store added objects."""
         self.added.append(obj)
 
-    async def commit(self):
-        """Track commits."""
-        self.commits += 1
+    async def flush(self):
+        """Track flushes."""
+        self.flushes += 1
 
     async def refresh(self, obj):
         """Track refreshes."""
@@ -72,5 +72,5 @@ def test_create_issue_sets_open_status(monkeypatch):
     assert created.status == IssueStatus.OPEN
     assert created.reporter_id == 7
     assert db.added == [created]
-    assert db.commits == 1
+    assert db.flushes == 1
     assert db.refreshes == [created]

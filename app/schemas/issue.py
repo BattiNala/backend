@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class IssuePriority(str, Enum):
@@ -144,6 +144,20 @@ class IssueDetailResponse(BaseModel):
     issue_location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+
+
+class IssueStatusUpdate(BaseModel):
+    """Schema for updating an issue status."""
+
+    issue_label: str
+    status: IssueStatus
+
+
+class IssueReportRequest(BaseModel):
+    """Schema for reporting a false issue."""
+
+    issue_label: str
+    reason: str = Field(..., min_length=30)
 
 
 class IssuePriorityOptionsResponse(BaseModel):

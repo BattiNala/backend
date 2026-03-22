@@ -65,7 +65,7 @@ class IssueRepository:
             attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_issue)
         return new_issue
 
@@ -93,7 +93,7 @@ class IssueRepository:
             attachments=[Attachment(path=path) for path in (attachment_paths or [])],
         )
         self.db.add(new_issue)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_issue)
         return new_issue
 
