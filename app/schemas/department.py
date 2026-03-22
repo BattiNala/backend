@@ -1,8 +1,6 @@
-"""
-Schemas for department-related data models.
-"""
+"""Schemas for department-related data models."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class DepartmentBase(BaseModel):
@@ -36,3 +34,16 @@ class DepartmentAdminCreate(BaseModel):
     email: str
     phone_number: str
     password: str
+
+
+class DepartmentAdmin(BaseModel):
+    """Schema for department admin information returned in responses."""
+
+    employee_id: int
+    user_id: int
+    department_name: str
+    name: str
+    email: EmailStr
+    phone_number: str
+    team_id: int | None
+    model_config = {"from_attributes": True}
