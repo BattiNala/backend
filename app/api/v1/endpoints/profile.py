@@ -3,17 +3,16 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencies import require_citizen
+from app.api.v1.dependencies import require_citizen, require_staff
 from app.db.session import get_db
 from app.models.citizens import Citizen
-
-# from app.models.department import Department
-# from app.models.employee import Employee
-# from app.models.team import Team
+from app.models.department import Department
+from app.models.employee import Employee
+from app.models.team import Team
 from app.repositories.citizen_repo import CitizenRepository
-
-# from app.repositories.employee_repo import EmployeeRepository
+from app.repositories.employee_repo import EmployeeRepository
 from app.schemas.citizen import CitizenProfile
+from app.schemas.employee import EmployeeProfile
 
 profile_router = APIRouter()
 
@@ -35,23 +34,24 @@ async def get_citizen_profile(
     )
 
 
-# @profile_router.get("/employee", response_model=EmployeeProfile)
-# async def get_employee_profile(
-#     current_employee: Employee = Depends(require_staff),
-#     db: AsyncSession = Depends(get_db),
-# ):
-#     """Return the profile of the currently authenticated employee."""
-#     employee_repo = EmployeeRepository(db)
-#     _employee_profile: Employee = await employee_repo.get_employee_profile_by_user_id(
-#         current_employee.user_id
-#     )
-#     team: Team = _employee_profile.teams
-#     department: Department = team.department if team else None
+@profile_router.get("/employee", response_model=EmployeeProfile)
+async def get_employee_profile(
+    current_employee: Employee = Depends(require_staff),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the profile of the currently authenticated employee."""
+    employee_repo = EmployeeRepository(db)
+    _employee_profile: Employee = await employee_repo.get_employee_profile_by_user_id(
+        current_employee.user_id
+    )
+    team: Team = _employee_profile.team
+    department: Department = team.department if team else None
 
-#     return EmployeeProfile(
-#         name=_employee_profile.name,
-#         email=_employee_profile.email,
-#         phone_number=_employee_profile.phone_number,
-#         team_name=team.team_name if team else None,
-#         department_name=department.department_name if department else None,
-#     )
+    return EmployeeProfile(
+        name=_employee_profile.name,
+        email=_employee_profile.email,
+        phone_number=_employee_profile.phone_number,
+        team_name=team.team_name if team else None,
+        department_name=department.department_name if department else None,
+        current_status=_employee_profile.current_status,
+    )
