@@ -6,10 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.models.department import Department
 from app.models.employee import Employee
 from app.models.team import Team
-from app.schemas.employee import EmployeeProfile
 
 
 class EmployeeRepository:
@@ -25,8 +23,8 @@ class EmployeeRepository:
         await self.db.refresh(employee)
         return employee
 
-    async def get_employee_profile_by_user_id(self, user_id: int) -> dict | None:
-        """Get an employee profile by user ID, including team and department information."""
+    async def get_employee_profile_by_user_id(self, user_id: int) -> Employee | None:
+        """Get an employee by user ID with team and department eagerly loaded."""
         stmt = (
             select(Employee)
             .options(
@@ -43,17 +41,7 @@ class EmployeeRepository:
         if not employee:
             return None
 
-        team: Team = employee.team
-        department: Department = team.department if team else None
-
-        return EmployeeProfile(
-            name=employee.name,
-            email=employee.email,
-            phone_number=employee.phone_number,
-            team_name=team.team_name if team else None,
-            department_name=department.department_name if department else None,
-            status=employee.current_status,
-        )
+        return employee
 
     async def get_employee_by_user_id(self, user_id: int) -> Employee | None:
         """Get an employee by their user ID."""
