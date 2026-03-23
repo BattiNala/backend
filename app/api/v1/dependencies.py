@@ -1,7 +1,7 @@
 """Authentication and request-scoped dependencies for API v1."""
 
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,15 +12,12 @@ from app.models.user import User
 from app.repositories.user_repo import UserRepository
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
-):
-    """Resolve and return the authenticated user from a bearer token."""
+async def _resolve_user_from_token(token: str, db: AsyncSession):
+    """Decode a bearer token and return the matching user."""
     credentials_exception = CredentialException()
-    token = credentials.credentials
 
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALG])
@@ -29,10 +26,57 @@ async def get_current_user(
             raise credentials_exception
     except jwt.PyJWTError as exc:
         raise credentials_exception from exc
+
     user = await UserRepository(db).get_user_by_id(user_id)
     if user is None:
         raise credentials_exception
     return user
+
+
+def _extract_authorization_token(authorization: str | None) -> str | None:
+    """Extract a JWT from the Authorization header.
+
+    Returns `None` only when the header is absent. Any malformed/non-bearer
+    header raises a credential error instead of being treated as anonymous.
+    """
+    if authorization is None:
+        return None
+
+    value = authorization.strip()
+    if not value:
+        raise CredentialException()
+
+    scheme, separator, credentials = value.partition(" ")
+    if not separator:
+        return value
+
+    if scheme.lower() != "bearer" or not credentials.strip():
+        raise CredentialException()
+
+    return credentials.strip()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve and return the authenticated user from a bearer token."""
+    return await _resolve_user_from_token(credentials.credentials, db)
+
+
+async def get_optional_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve and return the authenticated user when a bearer token is provided."""
+    token = credentials.credentials if credentials is not None else None
+    if token is None:
+        token = _extract_authorization_token(request.headers.get("Authorization"))
+    if token is None:
+        return None
+
+    return await _resolve_user_from_token(token, db)
 
 
 async def require_superadmin(
