@@ -24,7 +24,13 @@ from fastapi import (
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencies import get_current_user, require_department_admin, require_staff
+from app.api.v1.dependencies import (
+    get_current_user,
+    get_optional_current_user,
+    require_department_admin,
+    require_staff,
+)
+from app.api.v1.rbac import authorize_issue_access
 from app.core.logger import get_logger
 from app.db.session import get_db
 from app.models import Issue
@@ -63,6 +69,13 @@ logger = get_logger("api.issues")
 
 def _get_s3_service() -> S3Service:
     return S3Service(S3Config())
+
+
+def _populate_attachment_urls(issue) -> None:
+    """Replace attachment paths with full S3 URLs."""
+    s3 = _get_s3_service()
+    for attachment in issue.attachments:
+        attachment.path = s3.build_s3_url(attachment.path)
 
 
 async def _safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str], list[str]]:
@@ -448,33 +461,6 @@ async def get_my_issues(db: AsyncSession = Depends(get_db), user: User = Depends
     return IssueListResponse(issues=issues, total=len(issues))
 
 
-@issue_router.get(
-    "/{issue_label}", response_model=IssueDetailResponse, status_code=status.HTTP_200_OK
-)
-async def get_issue(issue_label: str, db: AsyncSession = Depends(get_db)):
-    """Return a placeholder issue detail response."""
-    issue_repo = IssueRepository(db)
-    issue = await issue_repo.get_issue_by_label(issue_label)
-    if not issue:
-        raise HTTPException(status_code=404, detail="Issue not found")
-    s3 = _get_s3_service()
-    for attachment in issue.attachments:
-        attachment.path = s3.build_s3_url(attachment.path)
-    return IssueDetailResponse(
-        issue_label=issue.issue_label,
-        issue_type=issue.department.department_name if issue.department else "Unknown",
-        description=issue.description,
-        status=issue.status,
-        issue_priority=issue.issue_priority,
-        assigned_to=issue.assignee.name if issue.assignee else None,
-        created_at=str(utc_to_timezone(issue.created_at)),
-        attachments=[attachment.path for attachment in issue.attachments],
-        issue_location=issue.issue_location.address if issue.issue_location else None,
-        latitude=issue.issue_location.latitude if issue.issue_location else None,
-        longitude=issue.issue_location.longitude if issue.issue_location else None,
-    )
-
-
 @issue_router.post(
     "/verify-status",
     status_code=status.HTTP_200_OK,
@@ -555,3 +541,44 @@ async def report_false_issue(
 ):
     """Placeholder for reporting a false issue by staff."""
     return {"message": "False report received (placeholder).", "issue_label": payload.issue_label}
+
+
+@issue_router.get(
+    "/{issue_label}",
+    response_model=IssueDetailResponse,
+    status_code=status.HTTP_200_OK,
+    description="Get detailed information about an issue by its label."
+    " Accessible by staff and department admins for their department's issues, "
+    "and by citizens for their own issues.",
+)
+async def get_issue(
+    issue_label: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """Return issue details.
+
+    Anonymous issues can be accessed without authentication.
+    Non-anonymous issues require authorization based on user role.
+    """
+    issue_repo = IssueRepository(db)
+    issue = await issue_repo.get_issue_by_label(issue_label)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    await authorize_issue_access(issue=issue, current_user=current_user, db=db)
+    _populate_attachment_urls(issue)
+
+    return IssueDetailResponse(
+        issue_label=issue.issue_label,
+        issue_type=issue.department.department_name if issue.department else "Unknown",
+        description=issue.description,
+        status=issue.status,
+        issue_priority=issue.issue_priority,
+        assigned_to=issue.assignee.name if issue.assignee else None,
+        created_at=str(utc_to_timezone(issue.created_at)),
+        attachments=[attachment.path for attachment in issue.attachments],
+        issue_location=issue.issue_location.address if issue.issue_location else None,
+        latitude=issue.issue_location.latitude if issue.issue_location else None,
+        longitude=issue.issue_location.longitude if issue.issue_location else None,
+    )
