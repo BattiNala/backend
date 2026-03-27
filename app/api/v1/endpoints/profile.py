@@ -45,7 +45,7 @@ async def get_employee_profile(
         current_employee.user_id
     )
     team: Team = _employee_profile.team
-    department: Department = team.department if team else None
+    department: Department = _employee_profile.department
 
     return EmployeeProfile(
         name=_employee_profile.name,

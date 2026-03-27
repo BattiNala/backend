@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.models.employee import Employee
-from app.models.team import Team
 
 
 class EmployeeRepository:
@@ -27,11 +26,7 @@ class EmployeeRepository:
         """Get an employee by user ID with team and department eagerly loaded."""
         stmt = (
             select(Employee)
-            .options(
-                joinedload(Employee.team).joinedload(  # load team
-                    Team.department
-                )  # load department through team
-            )
+            .options(joinedload(Employee.team), joinedload(Employee.department))
             .where(Employee.user_id == user_id)
         )
 
