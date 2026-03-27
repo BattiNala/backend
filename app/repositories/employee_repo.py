@@ -43,3 +43,13 @@ class EmployeeRepository:
         stmt = select(Employee).where(Employee.user_id == user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_employees_by_department(self, department_id: int) -> list[Employee]:
+        """Get all employees belonging to a specific department."""
+        stmt = (
+            select(Employee)
+            .where(Employee.department_id == department_id)
+            .options(joinedload(Employee.team), joinedload(Employee.department))
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
