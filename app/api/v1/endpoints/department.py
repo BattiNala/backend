@@ -6,7 +6,7 @@ Superadmin-only access is required for department management.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencies import get_current_user, require_superadmin
+from app.api.v1.dependencies import get_current_user, require_department_admin, require_superadmin
 from app.api.v1.utils import with_db_error
 from app.db.session import get_db
 from app.models.department import Department
@@ -23,6 +23,7 @@ from app.schemas.department import (
     DepartmentCreate,
     DepartmentList,
 )
+from app.schemas.employee import EmployeeProfile
 from app.utils.auth import get_password_hash
 
 department_router = APIRouter()
@@ -150,3 +151,34 @@ async def list_department_admins(
     """List department admins, optionally filtered by department."""
     department_repo = DepartmentRepository(db)
     return await department_repo.list_department_admins(department_id)
+
+
+@department_router.get(
+    "/list-employees",
+    response_model=list[EmployeeProfile],
+    dependencies=[Depends(require_department_admin)],
+    summary="List department employees",
+    description="List all employees in a specific department (superadmin only).",
+)
+async def list_department_employees(
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> list[EmployeeProfile]:
+    """List all employees in a specific department."""
+    employee_repo = EmployeeRepository(db)
+    current_employee: Employee | None = await employee_repo.get_employee_by_user_id(
+        user_id=current_user.user_id
+    )
+    if not current_employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    result = await employee_repo.get_employees_by_department(current_employee.department_id)
+    return [
+        EmployeeProfile(
+            name=employee.name,
+            email=employee.email,
+            phone_number=employee.phone_number,
+            team_name=employee.team.team_name if employee.team else None,
+            department_name=employee.department.department_name if employee.department else None,
+            current_status=employee.current_status,
+        )
+        for employee in result
+    ]
