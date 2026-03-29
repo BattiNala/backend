@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Type, TypeVar
+from typing import List, Type, TypeVar
 
 import aiofiles
 import aiofiles.os
@@ -459,7 +459,7 @@ async def get_my_issues(
     """Return issues visible to the current user within their role scope."""
     scoped_filters = await _scope_issue_filters_for_user(context, filters)
     issue_repo = IssueRepository(context.db)
-    issues: list[IssueListItem] = await issue_repo.list_issues(scoped_filters)
+    issues: List[IssueListItem] = await issue_repo.list_issues(scoped_filters)
     return IssueListResponse(items=issues, total=len(issues))
 
 

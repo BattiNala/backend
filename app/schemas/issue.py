@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 
 class IssuePriority(str, Enum):
@@ -125,8 +125,13 @@ class IssueListItem(BaseModel):
 class IssueListResponse(BaseModel):
     """Response model for listing issues."""
 
-    issues: list[IssueListItem]
+    items: list[IssueListItem] = Field(validation_alias=AliasChoices("items", "issues"))
     total: int
+
+    @property
+    def issues(self) -> list[IssueListItem]:
+        """Backward-compatible accessor for older callers."""
+        return self.items
 
 
 class IssueDetailResponse(BaseModel):

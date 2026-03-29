@@ -4,6 +4,7 @@ Issue repository for handling database operations related to issues.
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -147,7 +148,7 @@ class IssueRepository:
         await self.db.refresh(issue)
         return issue
 
-    async def list_issues(self, filters: IssueListFilters | None = None) -> list[IssueListItem]:
+    async def list_issues(self, filters: IssueListFilters | None = None) -> List[IssueListItem]:
         """List issues with optional filters."""
         filters = filters or IssueListFilters()
         stmt = select(Issue).options(joinedload(Issue.department))
