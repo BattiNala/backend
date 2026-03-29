@@ -48,6 +48,7 @@ from app.schemas.issue import (
     IssueCreateResponse,
     IssueDetailResponse,
     IssueListItem,
+    IssueListResponse,
     IssuePriority,
     IssuePriorityOptionsResponse,
     IssueReportRequest,
@@ -450,7 +451,7 @@ async def create_issue(
     )
 
 
-@issue_router.get("/my-issues", response_model=list[IssueListItem], status_code=status.HTTP_200_OK)
+@issue_router.get("/my-issues", status_code=status.HTTP_200_OK)
 async def get_my_issues(
     filters: IssueListFilters = Depends(_get_issue_list_filters),
     context: _IssueEndpointContext = Depends(_get_issue_endpoint_context),
@@ -459,7 +460,7 @@ async def get_my_issues(
     scoped_filters = await _scope_issue_filters_for_user(context, filters)
     issue_repo = IssueRepository(context.db)
     issues: list[IssueListItem] = await issue_repo.list_issues(scoped_filters)
-    return issues
+    return IssueListResponse(items=issues, total=len(issues))
 
 
 @issue_router.post(
