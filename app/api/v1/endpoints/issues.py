@@ -452,12 +452,14 @@ async def create_issue(
 
 
 @issue_router.get("/my-issues", response_model=IssueListResponse, status_code=status.HTTP_200_OK)
-async def get_my_issues(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """Return a list of issues reported by the current user."""
-    issue_repo = IssueRepository(db)
-    citizen_repo = CitizenRepository(db)
-    citizen: Citizen = await citizen_repo.get_citizen_by_user_id(user.user_id)
-    issues: list[IssueListItem] = await issue_repo.get_issues_by_reporter(citizen.citizen_id)
+async def get_my_issues(
+    filters: IssueListFilters = Depends(_get_issue_list_filters),
+    context: _IssueEndpointContext = Depends(_get_issue_endpoint_context),
+):
+    """Return issues visible to the current user within their role scope."""
+    scoped_filters = await _scope_issue_filters_for_user(context, filters)
+    issue_repo = IssueRepository(context.db)
+    issues: list[IssueListItem] = await issue_repo.list_issues(scoped_filters)
     return IssueListResponse(issues=issues, total=len(issues))
 
 

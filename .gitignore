@@ -213,3 +213,6 @@ API_DOCS.md
 openapi.json
 employees.csv
 citizen_credentials.csv
+employees_sewage.csv
+./tests/cli_tests/add_team.py
+./tests/cli_tests/add_employees.py

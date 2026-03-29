@@ -40,7 +40,12 @@ class EmployeeRepository:
 
     async def get_employee_by_user_id(self, user_id: int) -> Employee | None:
         """Get an employee by their user ID."""
-        stmt = select(Employee).where(Employee.user_id == user_id)
+        stmt = (
+            select(Employee)
+            .where(Employee.user_id == user_id)
+            .options(joinedload(Employee.department))
+        )
+
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
