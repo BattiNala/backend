@@ -13,6 +13,7 @@ from sqlalchemy.orm import joinedload
 from app.models.attachment import Attachment
 from app.models.issue import Issue
 from app.models.issue_location import IssueLocation
+from app.models.rejected_issue import RejectedIssue
 from app.schemas.issue import (
     AnonymousIssueCreate,
     IssueCreate,
@@ -203,3 +204,29 @@ class IssueRepository:
             )
             for issue in issues
         ]
+
+    async def reject_issue(
+        self,
+        issue: Issue,
+        reason: str,
+        rejected_by_employee_id: int | None = None,
+        auto_reject: bool = False,
+    ) -> Issue:
+        """Reject an issue with a reason and optional employee information."""
+
+        rejected_issue = RejectedIssue(
+            issue_id=issue.issue_id,
+            reason=reason,
+            rejected_by=rejected_by_employee_id,
+            auto_rejected=auto_reject,
+        )
+        self.db.add(rejected_issue)
+        await self.db.flush()
+        await self.db.refresh(rejected_issue)
+
+        issue.status = IssueStatus.REJECTED
+        self.db.add(issue)
+        await self.db.commit()
+        await self.db.refresh(issue)
+
+        return issue
