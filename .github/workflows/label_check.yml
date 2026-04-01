@@ -18,7 +18,7 @@ jobs:
         with:
           script: |
             const marker = '<!-- label-check -->';
-            const requiredLabels = ['enhancement', 'bug', 'chore', 'documentation'];
+            const requiredLabels = ['enhancement', 'bug', 'chore', 'documentation','depandabot','bugfix'];
 
             const pr = context.payload.pull_request;
             const labels = pr.labels.map(l => l.name);
