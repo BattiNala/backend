@@ -53,3 +53,9 @@ class Employee(Base):  # pylint: disable=too-few-public-methods
         back_populates="assignee",
         foreign_keys="Issue.assignee_id",
     )
+    rejected_issues = relationship(
+        "RejectedIssue",
+        back_populates="rejected_by_employee",
+        foreign_keys="RejectedIssue.rejected_by",
+        cascade="all, delete",
+    )
