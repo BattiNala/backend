@@ -48,6 +48,8 @@ from app.schemas.issue import (
     IssueListResponse,
     IssuePriority,
     IssuePriorityOptionsResponse,
+    IssueRejectRequest,
+    IssueRejectResponse,
     IssueReportRequest,
     IssueStatus,
     IssueStatusUpdate,
@@ -408,6 +410,41 @@ async def report_false_issue(
 ):
     """Placeholder for reporting a false issue by staff."""
     return {"message": "False report received (placeholder).", "issue_label": payload.issue_label}
+
+
+@issue_router.post(
+    "/reject",
+    status_code=status.HTTP_200_OK,
+    response_model=IssueRejectResponse,
+    description="Reject an issue (department admin only). "
+    "Only issues pending verification / reported can be rejected.",
+)
+async def reject_issue(
+    payload: IssueRejectRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_department_admin),
+):
+    """Reject an issue (department admin only)."""
+
+    issue_repo = IssueRepository(db)
+    employee_repo = EmployeeRepository(db)
+    issue = await issue_repo.get_issue_by_label(payload.issue_label)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    if issue.status != IssueStatus.PENDING_VERIFICATION:
+        raise HTTPException(
+            status_code=400,
+            detail="Only issues pending verification can be rejected.",
+        )
+
+    employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+    if not employee or issue.issue_type != employee.department_id:
+        raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
+
+    await issue_repo.reject_issue(
+        issue, reason=payload.reason, rejected_by_employee_id=employee.employee_id
+    )
+    return IssueRejectResponse(message="Issue rejected.", status=IssueStatus.REJECTED)
 
 
 @issue_router.get(
