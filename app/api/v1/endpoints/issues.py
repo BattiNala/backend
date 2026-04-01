@@ -1,15 +1,8 @@
 """Issue endpoints."""
 
 import json
-import os
-import tempfile
-from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
 from typing import List, Type, TypeVar
 
-import aiofiles
-import aiofiles.os
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -30,7 +23,12 @@ from app.api.v1.dependencies import (
     require_department_admin,
     require_staff,
 )
-from app.api.v1.rbac import authorize_issue_access
+from app.api.v1.rbac import (
+    IssueEndpointContext,
+    authorize_issue_access,
+    get_issue_list_filters,
+    scope_issue_filters_for_user,
+)
 from app.core.logger import get_logger
 from app.db.session import get_db
 from app.models import Issue
@@ -40,7 +38,6 @@ from app.repositories.citizen_repo import CitizenRepository
 from app.repositories.department_repo import DepartmentRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.issue_repo import IssueListFilters, IssueRepository
-from app.repositories.user_repo import UserRepository
 from app.schemas.issue import (
     AnonymousIssueCreate,
     AnonymousIssueCreateResponse,
@@ -56,10 +53,15 @@ from app.schemas.issue import (
     IssueStatusUpdate,
     IssueTypesList,
 )
-from app.services.s3_service import S3Config, S3Service
 from app.tasks.jobs import assign_issue_to_nearest_employee
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
+from app.utils.s3_utils import (
+    delete_temp_files,
+    delete_uploaded_files,
+    populate_attachment_urls,
+    safe_upload_photos_to_s3,
+)
 from app.utils.time import utc_to_timezone
 from app.utils.validators import ensure_required_user_agent, validate_photos
 
@@ -67,92 +69,15 @@ issue_router = APIRouter()
 logger = get_logger("api.issues")
 
 
-def _get_s3_service() -> S3Service:
-    return S3Service(S3Config())
-
-
-def _populate_attachment_urls(issue) -> None:
-    """Replace attachment paths with full S3 URLs."""
-    s3 = _get_s3_service()
-    for attachment in issue.attachments:
-        attachment.path = s3.build_s3_url(attachment.path)
-
-
-async def _safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str], list[str]]:
-    try:
-        async with _get_s3_service() as s3:
-            return await _upload_photos_to_s3(photos, s3)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while uploading photos.",
-        ) from e
-
-
 T = TypeVar("T", bound=BaseModel)
-
-
-@dataclass(slots=True)
-class _IssueEndpointContext:
-    """Request-scoped dependencies shared by issue endpoints."""
-
-    db: AsyncSession
-    current_user: User
 
 
 async def _get_issue_endpoint_context(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> _IssueEndpointContext:
+) -> IssueEndpointContext:
     """Bundle common issue endpoint dependencies into one object."""
-    return _IssueEndpointContext(db=db, current_user=current_user)
-
-
-def _get_issue_list_filters(
-    issue_status: IssueStatus | None = None,
-    priority: IssuePriority | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
-) -> IssueListFilters:
-    """Build list filters from query params."""
-    return IssueListFilters(
-        status=issue_status,
-        priority=priority,
-        date_from=date_from,
-        date_to=date_to,
-    )
-
-
-async def _scope_issue_filters_for_user(
-    context: _IssueEndpointContext, filters: IssueListFilters
-) -> IssueListFilters:
-    """Apply role-based issue visibility filters for the current user."""
-    user_repo = UserRepository(context.db)
-    role_name = await user_repo.get_user_role_name(context.current_user.user_id)
-
-    if role_name == "superadmin":
-        return filters
-
-    if role_name in {"department_admin", "staff"}:
-        employee_repo = EmployeeRepository(context.db)
-        employee = await employee_repo.get_employee_by_user_id(context.current_user.user_id)
-        if not employee:
-            raise HTTPException(status_code=403, detail="Access forbidden.")
-        if role_name == "department_admin":
-            filters.department_id = employee.department_id
-        else:
-            filters.assignee_id = employee.employee_id
-        return filters
-
-    if role_name == "citizen":
-        citizen_repo = CitizenRepository(context.db)
-        citizen = await citizen_repo.get_citizen_by_user_id(context.current_user.user_id)
-        if not citizen:
-            raise HTTPException(status_code=403, detail="Access forbidden.")
-        filters.reporter_id = citizen.citizen_id
-        return filters
-
-    raise HTTPException(status_code=403, detail="Access forbidden.")
+    return IssueEndpointContext(db=db, current_user=current_user)
 
 
 def _parse_issue_create(issue_create: str, schema_cls: Type[T]) -> T:
@@ -169,66 +94,6 @@ def _parse_issue_create(issue_create: str, schema_cls: Type[T]) -> T:
             status_code=422,
             detail=e.errors(),
         ) from e
-
-
-async def _upload_photos_to_s3(
-    photos: list[UploadFile],
-    s3: S3Service,
-) -> tuple[list[str], list[str]]:
-    attachment_paths: list[str] = []
-    temp_paths: list[str] = []
-    for photo in photos:
-        fd, temp_path = tempfile.mkstemp(suffix=Path(photo.filename).suffix)
-        os.close(fd)
-        temp_paths.append(temp_path)
-
-        async with aiofiles.open(temp_path, "wb") as out_file:
-            while chunk := await photo.read(1024 * 1024):
-                await out_file.write(chunk)
-
-        try:
-            object_key = await s3.upload_file(Path(temp_path))
-        except Exception:
-            await _delete_uploaded_s3_objects(s3, attachment_paths)
-            raise
-
-        if not object_key:
-            await _delete_uploaded_s3_objects(s3, attachment_paths)
-            raise RuntimeError(f"Failed to upload photo: {photo.filename}")
-
-        attachment_paths.append(object_key)
-    return attachment_paths, temp_paths
-
-
-async def delete_temp_files(temp_paths):
-    """Delete temporary files used for photo uploads."""
-    for tmp in temp_paths:
-        try:
-            await aiofiles.os.remove(tmp)
-        except FileNotFoundError:
-            # If the file was already removed, we can ignore this error
-            pass
-
-
-async def _delete_uploaded_s3_objects(s3: S3Service, object_keys: list[str]) -> None:
-    """Best-effort delete for uploaded S3 objects."""
-    for object_key in object_keys:
-        deleted = await s3.delete_file(object_key)
-        if not deleted:
-            logger.warning("Failed to delete uploaded attachment from storage: key=%s", object_key)
-
-
-async def delete_uploaded_files(object_keys: list[str]) -> None:
-    """Best-effort cleanup for uploaded S3 objects after request failure."""
-    if not object_keys:
-        return
-
-    try:
-        async with _get_s3_service() as s3:
-            await _delete_uploaded_s3_objects(s3, object_keys)
-    # pylint: disable=broad-exception-caught
-    except Exception:
-        logger.exception("Failed to clean up uploaded attachments: keys=%s", object_keys)
 
 
 @issue_router.get(
@@ -263,11 +128,11 @@ async def get_issue_types(db: AsyncSession = Depends(get_db)):
     " Filters: status, priority, date range.",
 )
 async def list_issues(
-    filters: IssueListFilters = Depends(_get_issue_list_filters),
-    context: _IssueEndpointContext = Depends(_get_issue_endpoint_context),
+    filters: IssueListFilters = Depends(get_issue_list_filters),
+    context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
 ):
     """Filters: status, priority, date range"""
-    scoped_filters = await _scope_issue_filters_for_user(context, filters)
+    scoped_filters = await scope_issue_filters_for_user(context, filters)
     issue_repo = IssueRepository(context.db)
     issues = await issue_repo.list_issues(scoped_filters)
     return {"items": issues, "total": len(issues)}
@@ -325,7 +190,7 @@ async def create_anonymous_issue(
     attachment_paths: list[str] = []
     temp_paths: list[str] = []
     try:
-        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
+        attachment_paths, temp_paths = await safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
 
@@ -399,7 +264,7 @@ async def create_issue(
     background_tasks: BackgroundTasks,
     photos: list[UploadFile] = File(...),
     issue_create: str = Form(...),
-    context: _IssueEndpointContext = Depends(_get_issue_endpoint_context),
+    context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
 ):
     """Create a new issue with user association."""
     ensure_required_user_agent(request, "BattinalaApp")
@@ -408,7 +273,7 @@ async def create_issue(
     temp_paths: list[str] = []
     try:
         issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
-        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
+        attachment_paths, temp_paths = await safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(context.db)
         citizen_repo = CitizenRepository(context.db)
@@ -453,11 +318,11 @@ async def create_issue(
 
 @issue_router.get("/my-issues", status_code=status.HTTP_200_OK)
 async def get_my_issues(
-    filters: IssueListFilters = Depends(_get_issue_list_filters),
-    context: _IssueEndpointContext = Depends(_get_issue_endpoint_context),
+    filters: IssueListFilters = Depends(get_issue_list_filters),
+    context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
 ):
     """Return issues visible to the current user within their role scope."""
-    scoped_filters = await _scope_issue_filters_for_user(context, filters)
+    scoped_filters = await scope_issue_filters_for_user(context, filters)
     issue_repo = IssueRepository(context.db)
     issues: List[IssueListItem] = await issue_repo.list_issues(scoped_filters)
     return IssueListResponse(items=issues, total=len(issues))
@@ -569,7 +434,7 @@ async def get_issue(
         raise HTTPException(status_code=404, detail="Issue not found")
 
     await authorize_issue_access(issue=issue, current_user=current_user, db=db)
-    _populate_attachment_urls(issue)
+    populate_attachment_urls(issue)
 
     return IssueDetailResponse(
         issue_label=issue.issue_label,

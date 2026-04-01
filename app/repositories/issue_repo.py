@@ -2,8 +2,6 @@
 Issue repository for handling database operations related to issues.
 """
 
-from dataclasses import dataclass
-from datetime import datetime
 from typing import List
 
 from sqlalchemy import select
@@ -17,24 +15,11 @@ from app.models.rejected_issue import RejectedIssue
 from app.schemas.issue import (
     AnonymousIssueCreate,
     IssueCreate,
+    IssueListFilters,
     IssueListItem,
-    IssuePriority,
     IssueStatus,
 )
 from app.utils.time import utc_to_timezone
-
-
-@dataclass(slots=True)
-class IssueListFilters:
-    """Optional filters for listing issues."""
-
-    status: IssueStatus | None = None
-    priority: IssuePriority | None = None
-    date_from: datetime | None = None
-    date_to: datetime | None = None
-    department_id: int | None = None
-    assignee_id: int | None = None
-    reporter_id: int | None = None
 
 
 class IssueRepository:
