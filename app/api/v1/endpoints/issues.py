@@ -23,6 +23,10 @@ from app.api.v1.dependencies import (
     require_department_admin,
     require_staff,
 )
+from app.api.v1.openapi_schema_helper import (
+    OPENAPI_ANON_ISSUE_SCHEMA,
+    OPENAPI_ISSUE_CREATE_SCHEMA,
+)
 from app.api.v1.rbac import (
     IssueEndpointContext,
     authorize_issue_access,
@@ -144,35 +148,7 @@ async def list_issues(
     "/anon-create",
     response_model=AnonymousIssueCreateResponse,
     status_code=status.HTTP_201_CREATED,
-    openapi_extra={
-        "requestBody": {
-            "content": {
-                "multipart/form-data": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "photos": {
-                                "type": "array",
-                                "items": {"type": "string", "format": "binary"},
-                                "description": "List of photo files to upload.",
-                            },
-                            "issue_create": {
-                                "type": "string",
-                                "description": "JSON string for anonymous issue creation."
-                                " Should match the AnonymousIssueCreate schema.",
-                                "example": json.dumps(
-                                    AnonymousIssueCreate.model_config["json_schema_extra"][
-                                        "example"
-                                    ]
-                                ),
-                            },
-                        },
-                        "required": ["photos", "issue_create"],
-                    }
-                }
-            }
-        }
-    },
+    openapi_extra=OPENAPI_ANON_ISSUE_SCHEMA,
 )
 async def create_anonymous_issue(
     request: Request,
@@ -231,35 +207,7 @@ async def create_anonymous_issue(
     "/create",
     status_code=status.HTTP_201_CREATED,
     response_model=IssueCreateResponse,
-    openapi_extra={
-        "requestBody": {
-            "content": {
-                "multipart/form-data": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "photos": {
-                                "type": "array",
-                                "items": {"type": "string", "format": "binary"},
-                                "description": "List of photo files to upload.",
-                            },
-                            "issue_create": {
-                                "type": "string",
-                                "description": (
-                                    "JSON string for issue creation. "
-                                    "Should match the IssueCreate schema."
-                                ),
-                                "example": json.dumps(
-                                    IssueCreate.model_config["json_schema_extra"]["example"]
-                                ),
-                            },
-                        },
-                        "required": ["photos", "issue_create"],
-                    }
-                }
-            }
-        }
-    },
+    openapi_extra=OPENAPI_ISSUE_CREATE_SCHEMA,
 )
 async def create_issue(
     request: Request,
