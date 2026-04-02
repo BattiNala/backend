@@ -40,3 +40,17 @@ class UserNotFoundException(HTTPException):
 
     def __init__(self, detail: str = "User not found"):
         super().__init__(status_code=404, detail=detail)
+
+
+class UnauthorizedException(HTTPException):
+    """Exception raised when a user is unauthorized to perform an action."""
+
+    def __init__(self, detail: str = "Unauthorized"):
+        super().__init__(status_code=403, detail=detail)
+
+
+class ErrorNotFoundException(HTTPException):
+    """Exception raised when a requested resource is not found."""
+
+    def __init__(self, detail: str = "Requested resource not found"):
+        super().__init__(status_code=404, detail=detail)

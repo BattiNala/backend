@@ -27,6 +27,8 @@ from app.api.v1.openapi_schema_helper import (
     OPENAPI_ANON_ISSUE_SCHEMA,
     OPENAPI_ISSUE_CREATE_SCHEMA,
 )
+
+# scoping helper functions
 from app.api.v1.rbac import (
     IssueEndpointContext,
     authorize_issue_access,
@@ -35,13 +37,24 @@ from app.api.v1.rbac import (
 )
 from app.core.logger import get_logger
 from app.db.session import get_db
+from app.exceptions.auth_expection import (
+    ErrorNotFoundException,
+    UnauthorizedException,
+)
+
+# models
 from app.models import Issue
 from app.models.citizens import Citizen
+from app.models.employee import Employee
 from app.models.user import User
+
+# centrakized repositories
 from app.repositories.citizen_repo import CitizenRepository
 from app.repositories.department_repo import DepartmentRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.issue_repo import IssueListFilters, IssueRepository
+
+# schemas
 from app.schemas.issue import (
     AnonymousIssueCreate,
     AnonymousIssueCreateResponse,
@@ -354,10 +367,31 @@ async def update_issue_status_by_employee(
 )
 async def report_false_issue(
     payload: IssueReportRequest,
-    _current_user: User = Depends(require_staff),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_staff),
 ):
-    """Placeholder for reporting a false issue by staff."""
-    return {"message": "False report received (placeholder).", "issue_label": payload.issue_label}
+    """Report a false issue by staff."""
+    issue_repo = IssueRepository(db)
+    employee_repo = EmployeeRepository(db)
+    issue: Issue = await issue_repo.get_issue_by_label(payload.issue_label)
+    employee: Employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+
+    if not issue:
+        raise ErrorNotFoundException(detail="Issue not found")
+    if issue.status not in (IssueStatus.OPEN, IssueStatus.IN_PROGRESS):
+        raise HTTPException(
+            status_code=400,
+            detail="Only open issues can be reported as false.",
+        )
+    if employee.employee_id != issue.assignee_id:
+        raise UnauthorizedException(
+            detail="Only the assigned employee can report this issue as false."
+        )
+
+    await issue_repo.report_issue_as_false(
+        issue, reason=payload.reason, reported_by_employee_id=employee.employee_id
+    )
+    return {"message": "Issue reported as false."}
 
 
 @issue_router.post(
