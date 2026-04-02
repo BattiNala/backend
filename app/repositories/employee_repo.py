@@ -58,3 +58,11 @@ class EmployeeRepository:
         )
         result = await self.db.execute(stmt)
         return result.scalars().all()
+
+    async def update_employee_status(self, employee: Employee, new_status: str) -> Employee:
+        """Update the status of an employee."""
+        employee.current_status = new_status
+        self.db.add(employee)
+        await self.db.commit()
+        await self.db.refresh(employee)
+        return employee
