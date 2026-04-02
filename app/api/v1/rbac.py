@@ -2,12 +2,25 @@
 Role-Based Access Control (RBAC) utilities for the application.
 """
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.repositories.citizen_repo import CitizenRepository
 from app.repositories.employee_repo import EmployeeRepository
+from app.repositories.user_repo import UserRepository
+from app.schemas.issue import IssueListFilters, IssuePriority, IssueStatus
+
+
+@dataclass(slots=True)
+class IssueEndpointContext:
+    """Request-scoped dependencies shared by issue endpoints."""
+
+    db: AsyncSession
+    current_user: User
 
 
 async def authorize_issue_access(issue, current_user: User | None, db: AsyncSession) -> None:
@@ -68,3 +81,54 @@ async def authorize_citizen(issue, current_user: User, db: AsyncSession) -> None
             status_code=403,
             detail="Access forbidden: Not reporter.",
         )
+
+
+def get_issue_list_filters(
+    issue_status: IssueStatus | None = None,
+    priority: IssuePriority | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> IssueListFilters:
+    """Build list filters from query params."""
+    return IssueListFilters(
+        status=issue_status,
+        priority=priority,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+async def scope_issue_filters_for_user(
+    context: IssueEndpointContext,
+    filters: IssueListFilters,
+    user_repo_cls: type[UserRepository] = UserRepository,
+    employee_repo_cls: type[EmployeeRepository] = EmployeeRepository,
+    citizen_repo_cls: type[CitizenRepository] = CitizenRepository,
+) -> IssueListFilters:
+    """Apply role-based issue visibility filters for the current user."""
+    user_repo = user_repo_cls(context.db)
+    role_name = await user_repo.get_user_role_name(context.current_user.user_id)
+
+    if role_name == "superadmin":
+        return filters
+
+    if role_name in {"department_admin", "staff"}:
+        employee_repo = employee_repo_cls(context.db)
+        employee = await employee_repo.get_employee_by_user_id(context.current_user.user_id)
+        if not employee:
+            raise HTTPException(status_code=403, detail="Access forbidden.")
+        if role_name == "department_admin":
+            filters.department_id = employee.department_id
+        else:
+            filters.assignee_id = employee.employee_id
+        return filters
+
+    if role_name == "citizen":
+        citizen_repo = citizen_repo_cls(context.db)
+        citizen = await citizen_repo.get_citizen_by_user_id(context.current_user.user_id)
+        if not citizen:
+            raise HTTPException(status_code=403, detail="Access forbidden.")
+        filters.reporter_id = citizen.citizen_id
+        return filters
+
+    raise HTTPException(status_code=403, detail="Access forbidden.")

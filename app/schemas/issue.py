@@ -1,5 +1,7 @@
 """Issue-related enums used by API and persistence layers."""
 
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -169,3 +171,30 @@ class IssuePriorityOptionsResponse(BaseModel):
     """Response model for issue priority options."""
 
     priorities: list[IssuePriority]
+
+
+class IssueRejectRequest(BaseModel):
+    """Schema for rejecting an issue."""
+
+    issue_label: str
+    reason: str = Field(..., min_length=30)
+
+
+class IssueRejectResponse(BaseModel):
+    """Response model for issue rejection."""
+
+    message: str
+    status: IssueStatus
+
+
+@dataclass(slots=True)
+class IssueListFilters:
+    """Optional filters for listing issues."""
+
+    status: IssueStatus | None = None
+    priority: IssuePriority | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    department_id: int | None = None
+    assignee_id: int | None = None
+    reporter_id: int | None = None

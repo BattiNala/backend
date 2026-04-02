@@ -3,6 +3,7 @@
 # pylint: disable=not-callable
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -16,12 +17,12 @@ from app.db.base import Base
 
 
 # pylint: disable=duplicate-code
-class IssueReport(Base):  # pylint: disable=too-few-public-methods
-    """Model representing an issue report submitted by a citizen."""
+class RejectedIssue(Base):  # pylint: disable=too-few-public-methods
+    """Model representing a rejected issue."""
 
-    __tablename__ = "issue_reports"
+    __tablename__ = "rejected_issues"
 
-    report_id = Column(Integer, primary_key=True, autoincrement=True)
+    reject_id = Column(Integer, primary_key=True, autoincrement=True)
     issue_id = Column(
         Integer,
         ForeignKey("issues.issue_id", ondelete="CASCADE"),
@@ -29,8 +30,11 @@ class IssueReport(Base):  # pylint: disable=too-few-public-methods
         index=True,
         unique=True,
     )
-    description = Column(String(1000), nullable=False)
-    reported_by = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
+    rejected_by = Column(
+        Integer, ForeignKey("employees.employee_id", ondelete="SET NULL"), nullable=True
+    )
+    auto_rejected = Column(Boolean, default=False, nullable=False)
+    reason = Column(String(1000), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -42,5 +46,5 @@ class IssueReport(Base):  # pylint: disable=too-few-public-methods
         onupdate=func.now(),
         nullable=False,
     )
-    issue = relationship("Issue", back_populates="reported_issue_reports")
-    reporter = relationship("Employee", back_populates="reported_issue_reports")
+    issue = relationship("Issue", back_populates="rejected_issues")
+    rejected_by_employee = relationship("Employee", back_populates="rejected_issues")

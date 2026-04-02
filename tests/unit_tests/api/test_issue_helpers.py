@@ -1,17 +1,26 @@
 """Tests for issue helpers."""
 
-# pylint: disable=protected-access,missing-function-docstring
+# pylint: disable=protected-access,missing-function-docstring,
 # pylint: disable=too-few-public-methods,comparison-with-callable
+# pylint: disable=too-many-positional-arguments,too-many-arguments
 
 import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
+import aiofiles
+import aiofiles.os
 import pytest
 from fastapi import BackgroundTasks
+from fastapi.routing import APIRoute
 
 from app.api.v1.endpoints import issues
-from app.schemas.issue import IssueCreate, IssueStatus, IssueStatusUpdate
+from app.schemas.issue import IssueCreate, IssueListItem, IssueStatus, IssueStatusUpdate
+from app.utils import s3_utils
+from app.utils.s3_utils import (
+    safe_upload_photos_to_s3,
+    upload_photos_to_s3,
+)
 
 ISSUE_CREATE_PAYLOAD = (
     '{"issue_type": 1, "description": "Pothole", "latitude": 27.7, "longitude": 85.3}'
@@ -43,7 +52,7 @@ def _upload_file(name: str, content: bytes) -> _UploadFile:
 def _issue_context(db, user_id):
     """Build a minimal issue endpoint context for direct endpoint calls."""
     user = type("User", (), {"user_id": user_id})()
-    return issues._IssueEndpointContext(db=db, current_user=user)
+    return issues.IssueEndpointContext(db=db, current_user=user)
 
 
 class _AsyncFile:
@@ -102,10 +111,10 @@ def test_safe_upload_photos_to_s3_wraps_failures(monkeypatch):
         """Return a failing async context manager."""
         return _BrokenContext()
 
-    monkeypatch.setattr(issues, "_get_s3_service", _broken_context)
+    monkeypatch.setattr(s3_utils, "get_s3_service", _broken_context)
 
     with pytest.raises(Exception) as exc:
-        asyncio.run(issues._safe_upload_photos_to_s3([]))
+        asyncio.run(safe_upload_photos_to_s3([]))
 
     assert exc.value.status_code == 500
 
@@ -134,10 +143,10 @@ def test_upload_photos_to_s3_and_delete_temp_files(monkeypatch):
         removed.append(path)
         Path(path).unlink(missing_ok=True)
 
-    monkeypatch.setattr(issues.aiofiles, "open", _AsyncFile)
-    monkeypatch.setattr(issues.aiofiles.os, "remove", _remove)
+    monkeypatch.setattr(aiofiles, "open", _AsyncFile)
+    monkeypatch.setattr(aiofiles.os, "remove", _remove)
 
-    attachment_paths, temp_paths = asyncio.run(issues._upload_photos_to_s3(photos, s3))
+    attachment_paths, temp_paths = asyncio.run(upload_photos_to_s3(photos, s3))
 
     assert attachment_paths == [f"stored/{path.split('/')[-1]}" for path in temp_paths]
     assert all(temp_path for temp_path in temp_paths)
@@ -171,10 +180,10 @@ def test_upload_photos_to_s3_cleans_up_partial_uploads(monkeypatch):
     photos = [_upload_file("first.jpg", b"abc"), _upload_file("second.png", b"def")]
     s3 = _FakeS3()
 
-    monkeypatch.setattr(issues.aiofiles, "open", _AsyncFile)
+    monkeypatch.setattr(aiofiles, "open", _AsyncFile)
 
     with pytest.raises(RuntimeError, match="Failed to upload photo: second.png"):
-        asyncio.run(issues._upload_photos_to_s3(photos, s3))
+        asyncio.run(upload_photos_to_s3(photos, s3))
 
     assert s3.deleted == ["stored/first.jpg"]
 
@@ -184,6 +193,122 @@ def test_get_issue_priority_options_returns_enum_values():
     response = asyncio.run(issues.get_issue_priority_options())
 
     assert response.priorities == ["LOW", "NORMAL", "HIGH"]
+
+
+@pytest.mark.parametrize(
+    ("role_name", "user_id", "employee", "citizen_id", "expected_scope"),
+    [
+        ("citizen", 7, None, 41, {"reporter_id": 41}),
+        (
+            "staff",
+            11,
+            type("Employee", (), {"employee_id": 19, "department_id": 5})(),
+            None,
+            {"assignee_id": 19},
+        ),
+        (
+            "department_admin",
+            13,
+            type("Employee", (), {"employee_id": 23, "department_id": 5})(),
+            None,
+            {"department_id": 5},
+        ),
+        ("superadmin", 17, None, None, {}),
+    ],
+)
+def test_get_my_issues_applies_role_scope(
+    monkeypatch, role_name, user_id, employee, citizen_id, expected_scope
+):
+    """Test my issues uses the shared role-based scoping helper."""
+
+    class _FakeIssueRepo:
+        """Repository test double."""
+
+        def __init__(self, _db):
+            pass
+
+        async def list_issues(self, filters):
+            assert filters.reporter_id == expected_scope.get("reporter_id")
+            assert filters.assignee_id == expected_scope.get("assignee_id")
+            assert filters.department_id == expected_scope.get("department_id")
+            return [
+                IssueListItem(
+                    issue_label="ISS-001",
+                    issue_priority="LOW",
+                    issue_type="Road Maintenance",
+                    description="Pothole",
+                    status="OPEN",
+                    created_at="2025-01-01T00:00:00+00:00",
+                ),
+                IssueListItem(
+                    issue_label="ISS-002",
+                    issue_priority="NORMAL",
+                    issue_type="Drainage",
+                    description="Broken drain",
+                    status="OPEN",
+                    created_at="2025-01-02T00:00:00+00:00",
+                ),
+            ]
+
+    class _FakeUserRepo:
+        """User repository test double."""
+
+        def __init__(self, _db):
+            pass
+
+        async def get_user_role_name(self, current_user_id):
+            assert current_user_id == user_id
+            return role_name
+
+    class _FakeCitizenRepo:
+        """Citizen repository test double."""
+
+        def __init__(self, _db):
+            pass
+
+        async def get_citizen_by_user_id(self, current_user_id):
+            assert current_user_id == user_id
+            if citizen_id is None:
+                return None
+            return type("CitizenProfile", (), {"citizen_id": citizen_id})()
+
+    class _FakeEmployeeRepo:
+        """Employee repository test double."""
+
+        def __init__(self, _db):
+            pass
+
+        async def get_employee_by_user_id(self, current_user_id):
+            assert current_user_id == user_id
+            return employee
+
+    monkeypatch.setattr(issues, "IssueRepository", _FakeIssueRepo)
+    monkeypatch.setattr(issues, "UserRepository", _FakeUserRepo)
+    monkeypatch.setattr(issues, "CitizenRepository", _FakeCitizenRepo)
+    monkeypatch.setattr(issues, "EmployeeRepository", _FakeEmployeeRepo)
+
+    response = asyncio.run(
+        issues.get_my_issues(
+            filters=issues.IssueListFilters(),
+            context=_issue_context(object(), user_id),
+        )
+    )
+
+    assert response.total == 2
+    assert [issue.issue_label for issue in response.issues] == ["ISS-001", "ISS-002"]
+
+
+def test_get_my_issues_route_uses_shared_issue_context_dependency():
+    """Test my issues uses the shared authenticated issue context."""
+    route = next(
+        route
+        for route in issues.issue_router.routes
+        if isinstance(route, APIRoute) and route.path == "/my-issues"
+    )
+
+    assert issues._get_issue_endpoint_context in {
+        dependency.call for dependency in route.dependant.dependencies
+    }
 
 
 def test_create_issue_queues_auto_assignment(monkeypatch):
@@ -245,7 +370,7 @@ def test_create_issue_queues_auto_assignment(monkeypatch):
 
     monkeypatch.setattr(issues, "ensure_required_user_agent", lambda *_args: None)
     monkeypatch.setattr(issues, "validate_photos", lambda _photos: None)
-    monkeypatch.setattr(issues, "_safe_upload_photos_to_s3", _fake_upload)
+    monkeypatch.setattr(issues, "safe_upload_photos_to_s3", _fake_upload)
     monkeypatch.setattr(issues, "delete_temp_files", _fake_delete)
     monkeypatch.setattr(issues, "IssueRepository", _FakeIssueRepo)
     monkeypatch.setattr(issues, "CitizenRepository", _FakeCitizenRepo)
