@@ -16,14 +16,14 @@ from app.services.s3_service import S3Config, S3Service
 logger = get_logger("api.issues")
 
 
-def _get_s3_service() -> S3Service:
+def get_s3_service() -> S3Service:
     """Create and return an S3Service instance."""
     return S3Service(S3Config())
 
 
 def populate_attachment_urls(issue) -> None:
     """Replace attachment paths with full S3 URLs."""
-    s3 = _get_s3_service()
+    s3 = get_s3_service()
     for attachment in issue.attachments:
         attachment.path = s3.build_s3_url(attachment.path)
 
@@ -34,7 +34,7 @@ async def safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str],
     Returns a tuple of (attachment_paths, temp_paths) for successful uploads.
     """
     try:
-        async with _get_s3_service() as s3:
+        async with get_s3_service() as s3:
             return await upload_photos_to_s3(photos, s3)
     except Exception as e:
         raise HTTPException(
@@ -99,7 +99,7 @@ async def delete_uploaded_files(object_keys: list[str]) -> None:
         return
 
     try:
-        async with _get_s3_service() as s3:
+        async with get_s3_service() as s3:
             await delete_uploaded_s3_objects(s3, object_keys)
     # pylint: disable=broad-exception-caught
     except Exception:

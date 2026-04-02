@@ -16,6 +16,7 @@ from fastapi.routing import APIRoute
 
 from app.api.v1.endpoints import issues
 from app.schemas.issue import IssueCreate, IssueListItem, IssueStatus, IssueStatusUpdate
+from app.utils import s3_utils
 from app.utils.s3_utils import (
     safe_upload_photos_to_s3,
     upload_photos_to_s3,
@@ -110,7 +111,7 @@ def test_safe_upload_photos_to_s3_wraps_failures(monkeypatch):
         """Return a failing async context manager."""
         return _BrokenContext()
 
-    monkeypatch.setattr(issues, "_get_s3_service", _broken_context)
+    monkeypatch.setattr(s3_utils, "get_s3_service", _broken_context)
 
     with pytest.raises(Exception) as exc:
         asyncio.run(safe_upload_photos_to_s3([]))

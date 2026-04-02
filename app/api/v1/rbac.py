@@ -99,17 +99,21 @@ def get_issue_list_filters(
 
 
 async def scope_issue_filters_for_user(
-    context: IssueEndpointContext, filters: IssueListFilters
+    context: IssueEndpointContext,
+    filters: IssueListFilters,
+    user_repo_cls: type[UserRepository] = UserRepository,
+    employee_repo_cls: type[EmployeeRepository] = EmployeeRepository,
+    citizen_repo_cls: type[CitizenRepository] = CitizenRepository,
 ) -> IssueListFilters:
     """Apply role-based issue visibility filters for the current user."""
-    user_repo = UserRepository(context.db)
+    user_repo = user_repo_cls(context.db)
     role_name = await user_repo.get_user_role_name(context.current_user.user_id)
 
     if role_name == "superadmin":
         return filters
 
     if role_name in {"department_admin", "staff"}:
-        employee_repo = EmployeeRepository(context.db)
+        employee_repo = employee_repo_cls(context.db)
         employee = await employee_repo.get_employee_by_user_id(context.current_user.user_id)
         if not employee:
             raise HTTPException(status_code=403, detail="Access forbidden.")
@@ -120,7 +124,7 @@ async def scope_issue_filters_for_user(
         return filters
 
     if role_name == "citizen":
-        citizen_repo = CitizenRepository(context.db)
+        citizen_repo = citizen_repo_cls(context.db)
         citizen = await citizen_repo.get_citizen_by_user_id(context.current_user.user_id)
         if not citizen:
             raise HTTPException(status_code=403, detail="Access forbidden.")

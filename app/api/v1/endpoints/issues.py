@@ -48,11 +48,12 @@ from app.models.citizens import Citizen
 from app.models.employee import Employee
 from app.models.user import User
 
-# centrakized repositories
+# centralized repositories
 from app.repositories.citizen_repo import CitizenRepository
 from app.repositories.department_repo import DepartmentRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.issue_repo import IssueListFilters, IssueRepository
+from app.repositories.user_repo import UserRepository
 
 # schemas
 from app.schemas.issue import (
@@ -97,6 +98,11 @@ async def _get_issue_endpoint_context(
 ) -> IssueEndpointContext:
     """Bundle common issue endpoint dependencies into one object."""
     return IssueEndpointContext(db=db, current_user=current_user)
+
+
+async def _safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str], list[str]]:
+    """Endpoint-local wrapper kept for compatibility and testability."""
+    return await safe_upload_photos_to_s3(photos)
 
 
 def _parse_issue_create(issue_create: str, schema_cls: Type[T]) -> T:
@@ -151,7 +157,13 @@ async def list_issues(
     context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
 ):
     """Filters: status, priority, date range"""
-    scoped_filters = await scope_issue_filters_for_user(context, filters)
+    scoped_filters = await scope_issue_filters_for_user(
+        context,
+        filters,
+        user_repo_cls=UserRepository,
+        employee_repo_cls=EmployeeRepository,
+        citizen_repo_cls=CitizenRepository,
+    )
     issue_repo = IssueRepository(context.db)
     issues = await issue_repo.list_issues(scoped_filters)
     return {"items": issues, "total": len(issues)}
@@ -181,7 +193,7 @@ async def create_anonymous_issue(
     attachment_paths: list[str] = []
     temp_paths: list[str] = []
     try:
-        attachment_paths, temp_paths = await safe_upload_photos_to_s3(photos)
+        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
 
@@ -236,7 +248,7 @@ async def create_issue(
     temp_paths: list[str] = []
     try:
         issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
-        attachment_paths, temp_paths = await safe_upload_photos_to_s3(photos)
+        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(context.db)
         citizen_repo = CitizenRepository(context.db)
@@ -285,7 +297,13 @@ async def get_my_issues(
     context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
 ):
     """Return issues visible to the current user within their role scope."""
-    scoped_filters = await scope_issue_filters_for_user(context, filters)
+    scoped_filters = await scope_issue_filters_for_user(
+        context,
+        filters,
+        user_repo_cls=UserRepository,
+        employee_repo_cls=EmployeeRepository,
+        citizen_repo_cls=CitizenRepository,
+    )
     issue_repo = IssueRepository(context.db)
     issues: List[IssueListItem] = await issue_repo.list_issues(scoped_filters)
     return IssueListResponse(items=issues, total=len(issues))
