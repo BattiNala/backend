@@ -56,6 +56,7 @@ from app.repositories.issue_repo import IssueListFilters, IssueRepository
 from app.repositories.user_repo import UserRepository
 
 # schemas
+from app.schemas.employee import EmployeeActivityStatus
 from app.schemas.issue import (
     AnonymousIssueCreate,
     AnonymousIssueCreateResponse,
@@ -352,17 +353,17 @@ async def verify_issue_status(
     "/update-status",
     status_code=status.HTTP_200_OK,
 )
-async def update_issue_status_by_employee(
+async def update_issue_status_by_admin(
     payload: IssueStatusUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_department_admin),
 ):
-    """Update issue status by staff/employee."""
-    if payload.status in {IssueStatus.PENDING_VERIFICATION, IssueStatus.REJECTED}:
-        raise HTTPException(
-            status_code=400,
-            detail="Staff cannot set status to PENDING_VERIFICATION or REJECTED.",
-        )
+    """Update issue status by department admin."""
+    # if payload.status in {IssueStatus.PENDING_VERIFICATION, IssueStatus.REJECTED}:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail="Staff cannot set status to PENDING_VERIFICATION or REJECTED.",
+    #     )
 
     issue_repo = IssueRepository(db)
     employee_repo = EmployeeRepository(db)
@@ -373,11 +374,45 @@ async def update_issue_status_by_employee(
     employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
     if not employee or issue.issue_type != employee.department_id:
         raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
-    if issue.assignee_id is not None and issue.assignee_id != employee.employee_id:
-        raise HTTPException(status_code=403, detail="Access forbidden: Not assignee.")
-
     await issue_repo.update_issue_status(issue, payload.status)
     return {"message": "Issue status updated.", "status": payload.status}
+
+
+@issue_router.post(
+    "/resolve",
+    status_code=status.HTTP_200_OK,
+)
+async def resolve_issue_by_staff(
+    payload: IssueStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    """Update issue status by staff/employee."""
+    if payload.status in {IssueStatus.PENDING_VERIFICATION, IssueStatus.REJECTED}:
+        raise HTTPException(
+            status_code=400,
+            detail="Staff cannot set status to PENDING_VERIFICATION or REJECTED.",
+        )
+    try:
+        issue_repo = IssueRepository(db)
+        employee_repo = EmployeeRepository(db)
+        issue = await issue_repo.get_issue_by_label(payload.issue_label)
+        if not issue:
+            raise HTTPException(status_code=404, detail="Issue not found")
+
+        employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+        if issue.assignee_id is not None and issue.assignee_id != employee.employee_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: Not assignee.")
+
+        await issue_repo.update_issue_status(issue, IssueStatus.RESOLVED)
+        await employee_repo.update_employee_status(employee, EmployeeActivityStatus.AVAILABLE)
+        return {"message": "Issue status updated.", "status": IssueStatus.RESOLVED}
+    except Exception as e:
+        logger.error("Error resolving issue: %s", str(e), exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while updating the issue status.",
+        ) from e
 
 
 @issue_router.post(
