@@ -22,15 +22,18 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
     """Assign an issue to the nearest available team's available employee."""
     async with AsyncSessionLocal() as db:
         logger.info("Starting issue auto-assignment for issue_id=%s", issue_id)
+
         result = await db.execute(
             select(Issue)
             .options(joinedload(Issue.issue_location))
             .where(Issue.issue_id == issue_id)
         )
         issue = result.scalars().first()
+
         if not issue:
             logger.warning("Issue auto-assignment skipped: issue_id=%s not found", issue_id)
             return
+
         if issue.assignee_id is not None:
             logger.info(
                 "Issue auto-assignment skipped: issue_id=%s already assigned to employee_id=%s",
@@ -38,6 +41,7 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
                 issue.assignee_id,
             )
             return
+
         if not issue.issue_location:
             logger.warning("Issue auto-assignment skipped: issue_id=%s has no location", issue_id)
             return
@@ -59,6 +63,7 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
 
         teams_result = await db.execute(select(Team).where(Team.department_id == issue.issue_type))
         teams = teams_result.scalars().all()
+
         if not teams:
             logger.info(
                 "Issue auto-assignment skipped: issue_id=%s has no teams for department_id=%s",
@@ -71,11 +76,13 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
             return haversine(
                 issue_location,
                 GeoLocation(
-                    latitude=float(team.base_latitude), longitude=float(team.base_longitude)
+                    latitude=float(team.base_latitude),
+                    longitude=float(team.base_longitude),
                 ),
             )
 
         teams_sorted = sorted(teams, key=team_distance)
+
         for team in teams_sorted:
             if not team.status:
                 continue
@@ -90,21 +97,24 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
                 .limit(1)
             )
             employee = employee_result.scalars().first()
+
             if not employee:
                 continue
 
             issue.assignee_id = employee.employee_id
             issue.status = IssueStatus.IN_PROGRESS
             employee.current_status = EmployeeActivityStatus.BUSY
+
             db.add(employee)
             db.add(issue)
+
             try:
                 await db.commit()
             except Exception:
                 await db.rollback()
                 logger.exception(
-                    "Issue auto-assignment failed during commit: issue_id=%s employee_id=%s "
-                    "team_id=%s",
+                    "Issue auto-assignment failed during commit: issue_id=%s employee_id=%s"
+                    " team_id=%s",
                     issue_id,
                     employee.employee_id,
                     team.team_id,
@@ -123,8 +133,8 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
             return
 
         logger.info(
-            "Issue auto-assignment pending: issue_id=%s "
-            "no available employee found for department_id=%s",
+            "Issue auto-assignment pending: issue_id=%s no available employee found for "
+            "department_id=%s",
             issue_id,
             issue.issue_type,
         )

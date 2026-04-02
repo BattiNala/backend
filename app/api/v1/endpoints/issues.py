@@ -74,6 +74,7 @@ from app.schemas.issue import (
     IssueStatusUpdate,
     IssueTypesList,
 )
+from app.tasks.celery_jobs import assign_issue_to_nearest_employee_task
 from app.tasks.jobs import assign_issue_to_nearest_employee
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
@@ -256,7 +257,6 @@ async def create_anonymous_issue(
 )
 async def create_issue(
     request: Request,
-    background_tasks: BackgroundTasks,
     photos: list[UploadFile] = File(...),
     issue_create: str = Form(...),
     context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
@@ -266,20 +266,28 @@ async def create_issue(
     validate_photos(photos)
     attachment_paths: list[str] = []
     temp_paths: list[str] = []
+
     try:
         issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
         attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(context.db)
         citizen_repo = CitizenRepository(context.db)
+
         citizen_profile: Citizen = await citizen_repo.get_citizen_by_user_id(
             context.current_user.user_id
         )
         issue_label = await generate_unique_issue_label(issue_repo)
+
         new_issue: Issue = await issue_repo.create_issue(
-            issue_create_obj, citizen_profile.citizen_id, issue_label, attachment_paths
+            issue_create_obj,
+            citizen_profile.citizen_id,
+            issue_label,
+            attachment_paths,
         )
+
         await context.db.commit()
+
     except HTTPException:
         await context.db.rollback()
         await delete_uploaded_files(attachment_paths)
@@ -294,7 +302,8 @@ async def create_issue(
     finally:
         await delete_temp_files(temp_paths)
 
-    background_tasks.add_task(assign_issue_to_nearest_employee, new_issue.issue_id)
+    assign_issue_to_nearest_employee_task.delay(new_issue.issue_id)
+
     logger.info(
         "Queued issue auto-assignment task: issue_id=%s issue_label=%s reporter_id=%s",
         new_issue.issue_id,

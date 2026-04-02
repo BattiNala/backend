@@ -378,11 +378,15 @@ def test_create_issue_queues_auto_assignment(monkeypatch):
     monkeypatch.setattr(issues, "utc_to_timezone", lambda dt: dt.isoformat())
 
     db = _FakeDB()
-    background_tasks = BackgroundTasks()
+    queued_issue_ids = []
+    monkeypatch.setattr(
+        issues,
+        "assign_issue_to_nearest_employee_task",
+        type("TaskStub", (), {"delay": staticmethod(queued_issue_ids.append)})(),
+    )
     response = asyncio.run(
         issues.create_issue(
             request=type("Request", (), {"headers": {"User-Agent": "BattinalaApp"}})(),
-            background_tasks=background_tasks,
             photos=[],
             issue_create=ISSUE_CREATE_PAYLOAD,
             context=_issue_context(db, 7),
@@ -390,9 +394,7 @@ def test_create_issue_queues_auto_assignment(monkeypatch):
     )
 
     assert response.issue_label == "ISS-100"
-    assert len(background_tasks.tasks) == 1
-    assert background_tasks.tasks[0].func is issues.assign_issue_to_nearest_employee
-    assert background_tasks.tasks[0].args == (17,)
+    assert queued_issue_ids == [17]
     assert db.commits == 1
     assert db.rollbacks == 0
 
@@ -461,12 +463,17 @@ def test_create_issue_cleans_up_uploaded_files_when_commit_fails(monkeypatch):
     monkeypatch.setattr(issues, "IssueRepository", _FakeIssueRepo)
     monkeypatch.setattr(issues, "CitizenRepository", _FakeCitizenRepo)
     monkeypatch.setattr(issues, "generate_issue_label", lambda: "ISS-100")
+    queued_issue_ids = []
+    monkeypatch.setattr(
+        issues,
+        "assign_issue_to_nearest_employee_task",
+        type("TaskStub", (), {"delay": staticmethod(queued_issue_ids.append)})(),
+    )
 
     with pytest.raises(Exception) as exc:
         asyncio.run(
             issues.create_issue(
                 request=type("Request", (), {"headers": {"User-Agent": "BattinalaApp"}})(),
-                background_tasks=BackgroundTasks(),
                 photos=[],
                 issue_create=ISSUE_CREATE_PAYLOAD,
                 context=_issue_context(_FakeDB(), 7),
@@ -475,6 +482,7 @@ def test_create_issue_cleans_up_uploaded_files_when_commit_fails(monkeypatch):
 
     assert exc.value.status_code == 500
     assert cleaned_up == [["stored/photo.jpg"]]
+    assert not queued_issue_ids
 
 
 def test_verify_issue_status_queues_auto_assignment_when_opened(monkeypatch):
