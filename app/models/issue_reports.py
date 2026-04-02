@@ -30,6 +30,7 @@ class IssueReport(Base):  # pylint: disable=too-few-public-methods
         unique=True,
     )
     description = Column(String(1000), nullable=False)
+    reported_by = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -42,3 +43,4 @@ class IssueReport(Base):  # pylint: disable=too-few-public-methods
         nullable=False,
     )
     issue = relationship("Issue", back_populates="reported_issue_reports")
+    reporter = relationship("Employee", back_populates="reported_issue_reports")
