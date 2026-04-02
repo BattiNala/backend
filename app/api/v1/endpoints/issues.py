@@ -123,6 +123,28 @@ def _parse_issue_create(issue_create: str, schema_cls: Type[T]) -> T:
         ) from e
 
 
+async def _get_current_employee(
+    db: AsyncSession,
+    user: User,
+) -> Employee:
+    """wrapper to get current employee profile, with error handling for missing profile"""
+    employee_repo = EmployeeRepository(db)
+    employee = await employee_repo.get_employee_by_user_id(user.user_id)
+
+    if not employee:
+        raise UnauthorizedException(detail="Employee not found")
+
+    return employee
+
+
+async def generate_unique_issue_label(issue_repo: IssueRepository) -> str:
+    """Generate a unique issue label, retrying if a collision occurs."""
+    issue_label = generate_issue_label()
+    while await issue_repo.check_issue_label_exists(issue_label):
+        issue_label = generate_issue_label()
+    return issue_label
+
+
 @issue_router.get(
     "/issue-priority-options",
     response_model=IssuePriorityOptionsResponse,
@@ -198,11 +220,7 @@ async def create_anonymous_issue(
         attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
-
-        issue_label = generate_issue_label()
-        while await issue_repo.check_issue_label_exists(issue_label):
-            issue_label = generate_issue_label()
-
+        issue_label = await generate_unique_issue_label(issue_repo)
         new_issue: Issue = await issue_repo.create_anon_issue(
             issue_create_obj,
             issue_label,
@@ -257,9 +275,7 @@ async def create_issue(
         citizen_profile: Citizen = await citizen_repo.get_citizen_by_user_id(
             context.current_user.user_id
         )
-        issue_label = generate_issue_label()
-        while await issue_repo.check_issue_label_exists(issue_label):
-            issue_label = generate_issue_label()
+        issue_label = await generate_unique_issue_label(issue_repo)
         new_issue: Issue = await issue_repo.create_issue(
             issue_create_obj, citizen_profile.citizen_id, issue_label, attachment_paths
         )
@@ -329,7 +345,6 @@ async def verify_issue_status(
         )
 
     issue_repo = IssueRepository(db)
-    employee_repo = EmployeeRepository(db)
     issue = await issue_repo.get_issue_by_label(payload.issue_label)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
@@ -339,7 +354,8 @@ async def verify_issue_status(
             detail="Only issues pending verification can be verified.",
         )
 
-    employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+    employee: Employee = await _get_current_employee(db, current_user)
+
     if not employee or issue.issue_type != employee.department_id:
         raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
 
@@ -366,12 +382,11 @@ async def update_issue_status_by_admin(
     #     )
 
     issue_repo = IssueRepository(db)
-    employee_repo = EmployeeRepository(db)
     issue = await issue_repo.get_issue_by_label(payload.issue_label)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
 
-    employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+    employee: Employee = await _get_current_employee(db, current_user)
     if not employee or issue.issue_type != employee.department_id:
         raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
     await issue_repo.update_issue_status(issue, payload.status)
@@ -388,11 +403,6 @@ async def resolve_issue_by_staff(
     current_user: User = Depends(require_staff),
 ):
     """Update issue status by staff/employee."""
-    if payload.status in {IssueStatus.PENDING_VERIFICATION, IssueStatus.REJECTED}:
-        raise HTTPException(
-            status_code=400,
-            detail="Staff cannot set status to PENDING_VERIFICATION or REJECTED.",
-        )
     try:
         issue_repo = IssueRepository(db)
         employee_repo = EmployeeRepository(db)
@@ -400,7 +410,7 @@ async def resolve_issue_by_staff(
         if not issue:
             raise HTTPException(status_code=404, detail="Issue not found")
 
-        employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+        employee: Employee = await _get_current_employee(db, current_user)
         if issue.assignee_id is not None and issue.assignee_id != employee.employee_id:
             raise HTTPException(status_code=403, detail="Access forbidden: Not assignee.")
 
@@ -408,6 +418,7 @@ async def resolve_issue_by_staff(
         await employee_repo.update_employee_status(employee, EmployeeActivityStatus.AVAILABLE)
         return {"message": "Issue status updated.", "status": IssueStatus.RESOLVED}
     except Exception as e:
+        await db.rollback()
         logger.error("Error resolving issue: %s", str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
@@ -424,28 +435,49 @@ async def report_false_issue(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    """Report a false issue by staff."""
-    issue_repo = IssueRepository(db)
-    employee_repo = EmployeeRepository(db)
-    issue: Issue = await issue_repo.get_issue_by_label(payload.issue_label)
-    employee: Employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+    """Report an issue as false (staff only).
+    Only the assigned employee can report their issue as false,
+    and only if it's currently open or in progress."""
+    try:
+        issue_repo = IssueRepository(db)
+        employee_repo = EmployeeRepository(db)
 
-    if not issue:
-        raise ErrorNotFoundException(detail="Issue not found")
-    if issue.status not in (IssueStatus.OPEN, IssueStatus.IN_PROGRESS):
-        raise HTTPException(
-            status_code=400,
-            detail="Only open issues can be reported as false.",
-        )
-    if employee.employee_id != issue.assignee_id:
-        raise UnauthorizedException(
-            detail="Only the assigned employee can report this issue as false."
+        issue: Issue = await issue_repo.get_issue_by_label(payload.issue_label)
+        if not issue:
+            raise ErrorNotFoundException(detail="Issue not found")
+
+        employee: Employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+        if not employee:
+            raise UnauthorizedException(detail="Employee not found")
+
+        if issue.status not in (IssueStatus.OPEN, IssueStatus.IN_PROGRESS):
+            raise HTTPException(
+                status_code=400,
+                detail="Only open issues can be reported as false.",
+            )
+
+        if employee.employee_id != issue.assignee_id:
+            raise UnauthorizedException(
+                detail="Only the assigned employee can report this issue as false."
+            )
+
+        await issue_repo.report_issue_as_false(
+            issue,
+            reason=payload.reason,
+            reported_by_employee_id=employee.employee_id,
         )
 
-    await issue_repo.report_issue_as_false(
-        issue, reason=payload.reason, reported_by_employee_id=employee.employee_id
-    )
-    return {"message": "Issue reported as false."}
+        await db.commit()
+
+        return {"message": "Issue reported as false."}
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error("Error reporting issue as false: %s", str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @issue_router.post(
