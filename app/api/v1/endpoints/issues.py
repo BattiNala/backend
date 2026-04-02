@@ -76,6 +76,7 @@ from app.schemas.issue import (
 from app.tasks.jobs import assign_issue_to_nearest_employee
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
+from app.utils.return_wrappers.issues import wrap_issue_detail_response
 from app.utils.s3_utils import (
     delete_temp_files,
     delete_uploaded_files,
@@ -466,23 +467,11 @@ async def get_issue(
     Non-anonymous issues require authorization based on user role.
     """
     issue_repo = IssueRepository(db)
-    issue = await issue_repo.get_issue_by_label(issue_label)
+    issue: Issue = await issue_repo.get_issue_by_label(issue_label)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
 
     await authorize_issue_access(issue=issue, current_user=current_user, db=db)
     populate_attachment_urls(issue)
 
-    return IssueDetailResponse(
-        issue_label=issue.issue_label,
-        issue_type=issue.department.department_name if issue.department else "Unknown",
-        description=issue.description,
-        status=issue.status,
-        issue_priority=issue.issue_priority,
-        assigned_to=issue.assignee.name if issue.assignee else None,
-        created_at=str(utc_to_timezone(issue.created_at)),
-        attachments=[attachment.path for attachment in issue.attachments],
-        issue_location=issue.issue_location.address if issue.issue_location else None,
-        latitude=issue.issue_location.latitude if issue.issue_location else None,
-        longitude=issue.issue_location.longitude if issue.issue_location else None,
-    )
+    return wrap_issue_detail_response(issue)

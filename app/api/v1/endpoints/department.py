@@ -25,6 +25,7 @@ from app.schemas.department import (
 )
 from app.schemas.employee import EmployeeProfile
 from app.utils.auth import get_password_hash
+from app.utils.return_wrappers.profile import wrap_employee_profile
 
 department_router = APIRouter()
 
@@ -171,14 +172,4 @@ async def list_department_employees(
     if not current_employee:
         raise HTTPException(status_code=404, detail="Employee not found")
     result = await employee_repo.get_employees_by_department(current_employee.department_id)
-    return [
-        EmployeeProfile(
-            name=employee.name,
-            email=employee.email,
-            phone_number=employee.phone_number,
-            team_name=employee.team.team_name if employee.team else None,
-            department_name=employee.department.department_name if employee.department else None,
-            current_status=employee.current_status,
-        )
-        for employee in result
-    ]
+    return [wrap_employee_profile(employee) for employee in result]
