@@ -9,9 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.models.attachment import Attachment
+from app.models.employee import Employee
 from app.models.issue import Issue
 from app.models.issue_location import IssueLocation
+from app.models.issue_reports import IssueReport
 from app.models.rejected_issue import RejectedIssue
+from app.schemas.employee import EmployeeActivityStatus
 from app.schemas.issue import (
     AnonymousIssueCreate,
     IssueCreate,
@@ -190,6 +193,37 @@ class IssueRepository:
             for issue in issues
         ]
 
+    async def report_issue_as_false(
+        self, issue: Issue, reason: str, reported_by_employee_id: int
+    ) -> Issue:
+        """Report an issue as false with a reason and employee information."""
+
+        reported_issue = IssueReport(
+            issue_id=issue.issue_id,
+            description=reason,
+            reported_by=reported_by_employee_id,
+        )
+        self.db.add(reported_issue)
+        await self.db.flush()
+        await self.db.refresh(reported_issue)
+
+        issue.status = IssueStatus.PENDING_VERIFICATION
+        issue.assignee_id = None
+        employee: Employee | None = None
+        if reported_by_employee_id:
+            employee_result = await self.db.execute(
+                select(Employee).where(Employee.employee_id == reported_by_employee_id)
+            )
+            employee = employee_result.scalars().first()
+            if employee and employee.current_status == EmployeeActivityStatus.BUSY:
+                employee.current_status = EmployeeActivityStatus.AVAILABLE
+                self.db.add(employee)
+        self.db.add(issue)
+        await self.db.commit()
+        await self.db.refresh(issue)
+
+        return issue
+
     async def reject_issue(
         self,
         issue: Issue,
@@ -210,6 +244,8 @@ class IssueRepository:
         await self.db.refresh(rejected_issue)
 
         issue.status = IssueStatus.REJECTED
+        issue.assignee_id = None
+
         self.db.add(issue)
         await self.db.commit()
         await self.db.refresh(issue)
