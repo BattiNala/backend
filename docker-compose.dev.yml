@@ -60,6 +60,29 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
 
+
+  celery_worker:
+    build: .
+    env_file:
+      - ./.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: battinala_db
+      JWT_SECRET: ffofijioejcvjvjvjdfnfiwfh
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uv run celery -A app.celery_app worker --loglevel=info
+
 volumes:
   postgres_data:
   mailpit_data:
