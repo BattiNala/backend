@@ -5,7 +5,7 @@ Celery Jobs Wrapper
 import asyncio
 
 from app.celery_app import celery_app
-from app.tasks.jobs import assign_issue_to_nearest_employee
+from app.tasks.jobs import assign_issue_to_nearest_employee, validate_issue
 
 
 @celery_app.task(
@@ -17,3 +17,14 @@ from app.tasks.jobs import assign_issue_to_nearest_employee
 def assign_issue_to_nearest_employee_task(issue_id: int) -> None:
     """Celery task wrapper for assign_issue_to_nearest_employee."""
     asyncio.run(assign_issue_to_nearest_employee(issue_id))
+
+
+@celery_app.task(
+    name="app.tasks.process_new_issue",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def process_new_issue_task(issue_id: int) -> None:
+    """Celery task wrapper for validate_issue."""
+    asyncio.run(validate_issue(issue_id))

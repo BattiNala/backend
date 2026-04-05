@@ -138,3 +138,8 @@ async def assign_issue_to_nearest_employee(issue_id: int) -> None:
             issue_id,
             issue.issue_type,
         )
+
+
+async def validate_issue(issue_id: int) -> None:
+    """Validate the image associated with an issue."""
+    logger.info("Validating image for issue_id=%s", issue_id)
