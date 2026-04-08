@@ -14,6 +14,7 @@ class Attachment(Base):  # pylint: disable=too-few-public-methods
     attachment_id = Column(Integer, primary_key=True, autoincrement=True)
     issue_id = Column(Integer, ForeignKey("issues.issue_id", ondelete="CASCADE"), nullable=False)
     path = Column(String(255), nullable=False)
+    phash = Column(String(20), nullable=True)
 
     issue = relationship("Issue", back_populates="attachments", foreign_keys=[issue_id])
 
@@ -22,6 +23,7 @@ class Attachment(Base):  # pylint: disable=too-few-public-methods
             "<Attachment("
             f"attachment_id={self.attachment_id}, "
             f"issue_id={self.issue_id}, "
-            f"path='{self.path}'"
+            f"path='{self.path}', "
+            f"phash='{self.phash}'"
             ")>"
         )

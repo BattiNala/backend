@@ -93,3 +93,15 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
         cascade="all, delete-orphan",
         single_parent=True,
     )
+    duplicate_of_issue_id = Column(
+        Integer,
+        ForeignKey("issues.issue_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    duplicate_of_issue = relationship(
+        "Issue",
+        remote_side=[issue_id],
+        backref="duplicates",
+        foreign_keys=[duplicate_of_issue_id],
+    )

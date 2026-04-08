@@ -5,7 +5,6 @@ from typing import List, Type, TypeVar
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -74,8 +73,8 @@ from app.schemas.issue import (
     IssueStatusUpdate,
     IssueTypesList,
 )
-from app.tasks.celery_jobs import assign_issue_to_nearest_employee_task
-from app.tasks.jobs import assign_issue_to_nearest_employee
+from app.services.issue_validation_service import IssueImageValidationService
+from app.tasks.celery_jobs import assign_issue_to_nearest_employee_task, process_new_issue_task
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
 from app.utils.return_wrappers.issues import wrap_issue_detail_response
@@ -106,6 +105,21 @@ async def _get_issue_endpoint_context(
 async def _safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str], list[str]]:
     """Endpoint-local wrapper kept for compatibility and testability."""
     return await safe_upload_photos_to_s3(photos)
+
+
+async def _build_attachment_payloads(
+    photos: list[UploadFile],
+) -> tuple[list[dict[str, str | None]], list[str], list[str]]:
+    """Upload issue photos and attach a perceptual hash for each file."""
+    attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
+    attachment_payloads = [
+        {
+            "path": s3_path,
+            "phash": IssueImageValidationService.compute_phash(temp_path),
+        }
+        for s3_path, temp_path in zip(attachment_paths, temp_paths)
+    ]
+    return attachment_payloads, attachment_paths, temp_paths
 
 
 def _parse_issue_create(issue_create: str, schema_cls: Type[T]) -> T:
@@ -269,7 +283,7 @@ async def create_issue(
 
     try:
         issue_create_obj = _parse_issue_create(issue_create, IssueCreate)
-        attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
+        attachment_payloads, attachment_paths, temp_paths = await _build_attachment_payloads(photos)
 
         issue_repo = IssueRepository(context.db)
         citizen_repo = CitizenRepository(context.db)
@@ -283,18 +297,20 @@ async def create_issue(
             issue_create_obj,
             citizen_profile.citizen_id,
             issue_label,
-            attachment_paths,
+            attachment_payloads,
         )
 
         await context.db.commit()
 
-    except HTTPException:
+    except HTTPException as e:
         await context.db.rollback()
         await delete_uploaded_files(attachment_paths)
+        logger.error("Issue creation failed with HTTPException: %s", e.detail)
         raise
     except Exception as e:
         await context.db.rollback()
         await delete_uploaded_files(attachment_paths)
+        logger.error("Issue creation failed with Exception: %s", e, exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="An error occurred while creating the issue.",
@@ -302,10 +318,10 @@ async def create_issue(
     finally:
         await delete_temp_files(temp_paths)
 
-    assign_issue_to_nearest_employee_task.delay(new_issue.issue_id)
+    process_new_issue_task.delay(new_issue.issue_id)
 
     logger.info(
-        "Queued issue auto-assignment task: issue_id=%s issue_label=%s reporter_id=%s",
+        "Queued issue processing task: issue_id=%s issue_label=%s reporter_id=%s",
         new_issue.issue_id,
         new_issue.issue_label,
         citizen_profile.citizen_id,
@@ -342,7 +358,6 @@ async def get_my_issues(
 )
 async def verify_issue_status(
     payload: IssueStatusUpdate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_department_admin),
 ):
@@ -369,8 +384,7 @@ async def verify_issue_status(
         raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
 
     await issue_repo.update_issue_status(issue, payload.status)
-    if payload.status == IssueStatus.OPEN and issue.assignee_id is None:
-        background_tasks.add_task(assign_issue_to_nearest_employee, issue.issue_id)
+    assign_issue_to_nearest_employee_task.delay(issue.issue_id)
     return {"message": "Issue status updated.", "status": payload.status}
 
 

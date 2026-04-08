@@ -14,6 +14,7 @@ from app.models.issue import Issue
 from app.models.issue_location import IssueLocation
 from app.models.issue_reports import IssueReport
 from app.models.rejected_issue import RejectedIssue
+from app.schemas.attachment import AttachmentCreatePayload
 from app.schemas.employee import EmployeeActivityStatus
 from app.schemas.issue import (
     AnonymousIssueCreate,
@@ -37,7 +38,10 @@ class IssueRepository:
         return result.scalars().first() is not None
 
     async def create_anon_issue(
-        self, issue_data: AnonymousIssueCreate, issue_label: str, attachment_paths: list[str] = None
+        self,
+        issue_data: AnonymousIssueCreate,
+        issue_label: str,
+        attachments: list[AttachmentCreatePayload] | None = None,
     ):
         """Create a new anonymous issue in the database."""
         new_issue = Issue(
@@ -52,7 +56,10 @@ class IssueRepository:
                 longitude=str(issue_data.longitude),
                 address=issue_data.issue_location,
             ),
-            attachments=[Attachment(path=path) for path in (attachment_paths or [])],
+            attachments=[
+                Attachment(path=attachment["path"], phash=attachment["phash"])
+                for attachment in (attachments or [])
+            ],
         )
         self.db.add(new_issue)
         await self.db.flush()
@@ -64,8 +71,8 @@ class IssueRepository:
         issue_data: IssueCreate,
         user_id: int,
         issue_label: str,
-        attachment_paths: list[str] = None,
-    ):
+        attachments: list[AttachmentCreatePayload] | None = None,
+    ) -> Issue:
         """Create a new issue in the database."""
         new_issue = Issue(
             issue_label=issue_label,
@@ -80,7 +87,10 @@ class IssueRepository:
                 longitude=str(issue_data.longitude),
                 address=issue_data.issue_location,
             ),
-            attachments=[Attachment(path=path) for path in (attachment_paths or [])],
+            attachments=[
+                Attachment(path=attachment["path"], phash=attachment["phash"])
+                for attachment in (attachments or [])
+            ],
         )
         self.db.add(new_issue)
         await self.db.flush()
@@ -89,9 +99,18 @@ class IssueRepository:
 
     async def get_issue_by_id(self, issue_id: int) -> Issue:
         """Get an issue by its ID, including its location information."""
+        # stmt = (
+        #     select(Issue)
+        #     .options(joinedload(Issue.issue_location))
+        #     .where(Issue.issue_id == issue_id)
+        # )
         stmt = (
             select(Issue)
             .options(joinedload(Issue.issue_location))
+            .options(joinedload(Issue.attachments))
+            .options(joinedload(Issue.department))
+            .options(joinedload(Issue.reporter))
+            .options(joinedload(Issue.assignee))
             .where(Issue.issue_id == issue_id)
         )
         result = await self.db.execute(stmt)

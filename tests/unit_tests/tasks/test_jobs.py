@@ -2,10 +2,10 @@
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from app.schemas.issue import IssueStatus
-from app.tasks import jobs
+from app.tasks import jobs, task_assign_job
 
 
 class _Scalars:
@@ -92,17 +92,17 @@ def test_assign_issue_to_nearest_employee_logs_successful_assignment(monkeypatch
     session = _FakeSession([issue, [team], employee])
     info = Mock()
 
-    monkeypatch.setattr(jobs, "AsyncSessionLocal", lambda: session)
-    monkeypatch.setattr(jobs, "haversine", lambda *_args: 0.0)
-    monkeypatch.setattr(jobs.logger, "info", info)
-    monkeypatch.setattr(jobs.logger, "warning", Mock())
-    monkeypatch.setattr(jobs.logger, "exception", Mock())
+    monkeypatch.setattr(task_assign_job, "AsyncSessionLocal", lambda: session)
+    monkeypatch.setattr(task_assign_job, "haversine", lambda *_args: 0.0)
+    monkeypatch.setattr(task_assign_job.logger, "info", info)
+    monkeypatch.setattr(task_assign_job.logger, "warning", Mock())
+    monkeypatch.setattr(task_assign_job.logger, "exception", Mock())
 
-    asyncio.run(jobs.assign_issue_to_nearest_employee(issue.issue_id))
+    asyncio.run(task_assign_job.assign_issue_to_nearest_employee(issue.issue_id))
 
     assert issue.assignee_id == employee.employee_id
     assert issue.status == IssueStatus.IN_PROGRESS
-    assert employee.current_status == jobs.EmployeeActivityStatus.BUSY
+    assert employee.current_status == task_assign_job.EmployeeActivityStatus.BUSY
     assert session.added == [employee, issue]
     assert session.committed is True
     assert session.rolled_back is False
@@ -138,13 +138,13 @@ def test_assign_issue_to_nearest_employee_logs_pending_when_no_employee(monkeypa
     session = _FakeSession([issue, [team], None])
     info = Mock()
 
-    monkeypatch.setattr(jobs, "AsyncSessionLocal", lambda: session)
-    monkeypatch.setattr(jobs, "haversine", lambda *_args: 0.0)
-    monkeypatch.setattr(jobs.logger, "info", info)
-    monkeypatch.setattr(jobs.logger, "warning", Mock())
-    monkeypatch.setattr(jobs.logger, "exception", Mock())
+    monkeypatch.setattr(task_assign_job, "AsyncSessionLocal", lambda: session)
+    monkeypatch.setattr(task_assign_job, "haversine", lambda *_args: 0.0)
+    monkeypatch.setattr(task_assign_job.logger, "info", info)
+    monkeypatch.setattr(task_assign_job.logger, "warning", Mock())
+    monkeypatch.setattr(task_assign_job.logger, "exception", Mock())
 
-    asyncio.run(jobs.assign_issue_to_nearest_employee(issue.issue_id))
+    asyncio.run(task_assign_job.assign_issue_to_nearest_employee(issue.issue_id))
 
     assert issue.assignee_id is None
     assert issue.status == IssueStatus.OPEN
@@ -157,4 +157,110 @@ def test_assign_issue_to_nearest_employee_logs_pending_when_no_employee(monkeypa
         ),
         18,
         5,
+    )
+
+
+def test_validate_issue_images_accepts_strong_match(monkeypatch):
+    """Accepted image validation returns accepted without mutating issue state."""
+    issue = SimpleNamespace(
+        issue_id=13,
+        description="Large pothole on the road",
+        department=SimpleNamespace(department_name="Roads"),
+        attachments=[SimpleNamespace(path="uploads/photo.jpg")],
+    )
+    issue_repo = Mock()
+    verification_response = SimpleNamespace(
+        ok=True,
+        result=SimpleNamespace(verdict="strong_match", score=95),
+        message=None,
+    )
+
+    monkeypatch.setattr(
+        jobs, "return_attachment_urls", lambda _issue: ["https://example.com/photo"]
+    )
+    monkeypatch.setattr(jobs, "llm_verify", AsyncMock(return_value=verification_response))
+    monkeypatch.setattr(
+        jobs,
+        "should_auto_accept",
+        lambda result: (result.verdict, result.score) == ("strong_match", 95),
+    )
+    monkeypatch.setattr(jobs, "should_reject", lambda _result: False)
+
+    status = asyncio.run(jobs.validate_issue_images(issue_repo, issue))
+
+    assert status == "accepted"
+    issue_repo.reject_issue.assert_not_called()
+    issue_repo.update_issue_status.assert_not_called()
+
+
+def test_validate_issue_images_rejects_weak_match(monkeypatch):
+    """Rejected image validation persists a rejected outcome."""
+    issue = SimpleNamespace(
+        issue_id=21,
+        description="Image does not match the report",
+        department=SimpleNamespace(department_name="Sanitation"),
+        attachments=[SimpleNamespace(path="uploads/photo.jpg")],
+    )
+    issue_repo = Mock()
+    issue_repo.reject_issue = AsyncMock()
+    verification_response = SimpleNamespace(
+        ok=True,
+        result=SimpleNamespace(
+            verdict="irrelevant_or_unusable",
+            score=5,
+            rationale="Image is unrelated",
+        ),
+        message="Image is unrelated",
+    )
+
+    monkeypatch.setattr(
+        jobs, "return_attachment_urls", lambda _issue: ["https://example.com/photo"]
+    )
+    monkeypatch.setattr(jobs, "llm_verify", AsyncMock(return_value=verification_response))
+    monkeypatch.setattr(jobs, "should_auto_accept", lambda _result: False)
+    monkeypatch.setattr(
+        jobs,
+        "should_reject",
+        lambda result: (result.verdict, result.score) == ("irrelevant_or_unusable", 5),
+    )
+
+    status = asyncio.run(jobs.validate_issue_images(issue_repo, issue))
+
+    assert status == "rejected"
+    issue_repo.reject_issue.assert_awaited_once_with(
+        issue,
+        reason="Rejected by LLMImage is unrelated",
+        auto_reject=True,
+    )
+
+
+def test_validate_issue_images_marks_manual_review(monkeypatch):
+    """Borderline image validation moves the issue to manual review."""
+    issue = SimpleNamespace(
+        issue_id=34,
+        description="Image is somewhat unclear",
+        department=SimpleNamespace(department_name="Roads"),
+        attachments=[SimpleNamespace(path="uploads/photo.jpg")],
+    )
+    issue_repo = Mock()
+    issue_repo.update_issue_status = AsyncMock()
+    verification_response = SimpleNamespace(
+        ok=True,
+        result=SimpleNamespace(verdict="moderate_match", score=65),
+        message=None,
+    )
+
+    monkeypatch.setattr(
+        jobs, "return_attachment_urls", lambda _issue: ["https://example.com/photo"]
+    )
+    monkeypatch.setattr(jobs, "llm_verify", AsyncMock(return_value=verification_response))
+    monkeypatch.setattr(jobs, "should_auto_accept", lambda _result: False)
+    monkeypatch.setattr(jobs, "should_reject", lambda _result: False)
+
+    status = asyncio.run(jobs.validate_issue_images(issue_repo, issue))
+
+    assert status == "manual_review"
+    issue_repo.update_issue_status.assert_awaited_once_with(
+        issue,
+        status=IssueStatus.PENDING_VERIFICATION,
     )

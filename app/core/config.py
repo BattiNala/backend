@@ -63,7 +63,7 @@ class Settings(BaseSettings):
         "living_street",
         "road",
     ]
-    MISTRAL_API_KEY: str
+    MISTRAL_API_KEY: str = "api-key-placeholder"
 
 
 settings = Settings()

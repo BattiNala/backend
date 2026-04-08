@@ -1,4 +1,6 @@
 [MASTER]
 ignore=alembic, tests/cli_tests
+
 [TYPECHECK]
-extension-pkg-allow-list=time
+extension-pkg-allow-list=time,cv2
+generated-members=cv2.*
