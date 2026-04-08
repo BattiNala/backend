@@ -2,7 +2,6 @@ FROM ghcr.io/battinala/backend/python-base:latest
 
 WORKDIR /app
 
-
 COPY . .
 
 EXPOSE 8000
