@@ -180,9 +180,11 @@ def test_validate_issue_images_accepts_strong_match(monkeypatch):
     )
     monkeypatch.setattr(jobs, "llm_verify", AsyncMock(return_value=verification_response))
     monkeypatch.setattr(
-        jobs, "should_auto_accept", lambda verdict, score: (verdict, score) == ("strong_match", 95)
+        jobs,
+        "should_auto_accept",
+        lambda result: (result.verdict, result.score) == ("strong_match", 95),
     )
-    monkeypatch.setattr(jobs, "should_reject", lambda *_args: False)
+    monkeypatch.setattr(jobs, "should_reject", lambda _result: False)
 
     status = asyncio.run(jobs.validate_issue_images(issue_repo, issue))
 
@@ -203,7 +205,11 @@ def test_validate_issue_images_rejects_weak_match(monkeypatch):
     issue_repo.reject_issue = AsyncMock()
     verification_response = SimpleNamespace(
         ok=True,
-        result=SimpleNamespace(verdict="irrelevant_or_unusable", score=5),
+        result=SimpleNamespace(
+            verdict="irrelevant_or_unusable",
+            score=5,
+            rationale="Image is unrelated",
+        ),
         message="Image is unrelated",
     )
 
@@ -211,11 +217,11 @@ def test_validate_issue_images_rejects_weak_match(monkeypatch):
         jobs, "return_attachment_urls", lambda _issue: ["https://example.com/photo"]
     )
     monkeypatch.setattr(jobs, "llm_verify", AsyncMock(return_value=verification_response))
-    monkeypatch.setattr(jobs, "should_auto_accept", lambda *_args: False)
+    monkeypatch.setattr(jobs, "should_auto_accept", lambda _result: False)
     monkeypatch.setattr(
         jobs,
         "should_reject",
-        lambda verdict, score: (verdict, score) == ("irrelevant_or_unusable", 5),
+        lambda result: (result.verdict, result.score) == ("irrelevant_or_unusable", 5),
     )
 
     status = asyncio.run(jobs.validate_issue_images(issue_repo, issue))
@@ -223,7 +229,7 @@ def test_validate_issue_images_rejects_weak_match(monkeypatch):
     assert status == "rejected"
     issue_repo.reject_issue.assert_awaited_once_with(
         issue,
-        reason="Image is unrelated",
+        reason="Rejected by LLMImage is unrelated",
         auto_reject=True,
     )
 
@@ -248,8 +254,8 @@ def test_validate_issue_images_marks_manual_review(monkeypatch):
         jobs, "return_attachment_urls", lambda _issue: ["https://example.com/photo"]
     )
     monkeypatch.setattr(jobs, "llm_verify", AsyncMock(return_value=verification_response))
-    monkeypatch.setattr(jobs, "should_auto_accept", lambda *_args: False)
-    monkeypatch.setattr(jobs, "should_reject", lambda *_args: False)
+    monkeypatch.setattr(jobs, "should_auto_accept", lambda _result: False)
+    monkeypatch.setattr(jobs, "should_reject", lambda _result: False)
 
     status = asyncio.run(jobs.validate_issue_images(issue_repo, issue))
 
