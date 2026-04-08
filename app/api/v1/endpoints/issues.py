@@ -5,7 +5,6 @@ from typing import List, Type, TypeVar
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -75,8 +74,7 @@ from app.schemas.issue import (
     IssueTypesList,
 )
 from app.services.issue_validation_service import IssueImageValidationService
-from app.tasks.celery_jobs import process_new_issue_task
-from app.tasks.jobs import assign_issue_to_nearest_employee
+from app.tasks.celery_jobs import assign_issue_to_nearest_employee_task, process_new_issue_task
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
 from app.utils.return_wrappers.issues import wrap_issue_detail_response
@@ -360,7 +358,6 @@ async def get_my_issues(
 )
 async def verify_issue_status(
     payload: IssueStatusUpdate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_department_admin),
 ):
@@ -387,8 +384,7 @@ async def verify_issue_status(
         raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
 
     await issue_repo.update_issue_status(issue, payload.status)
-    if payload.status == IssueStatus.OPEN and issue.assignee_id is None:
-        background_tasks.add_task(assign_issue_to_nearest_employee, issue.issue_id)
+    assign_issue_to_nearest_employee_task.delay(issue.issue_id)
     return {"message": "Issue status updated.", "status": payload.status}
 
 

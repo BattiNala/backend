@@ -8,13 +8,13 @@ from app.tasks import celery_jobs
 def test_celery_imports_register_issue_assignment_task():
     celery_app.loader.import_default_modules()
 
-    assert "app.tasks.assign_issue_to_nearest_employee" in celery_app.tasks
+    assert "app.tasks.task_assign_job.assign_issue_to_nearest_employee" in celery_app.tasks
 
 
 def test_celery_imports_register_issue_processing_task():
     celery_app.loader.import_default_modules()
 
-    assert "app.tasks.process_new_issue" in celery_app.tasks
+    assert "app.tasks.celery_jobs.process_new_issue" in celery_app.tasks
 
 
 def test_run_async_reuses_runner(monkeypatch):
