@@ -99,9 +99,18 @@ class IssueRepository:
 
     async def get_issue_by_id(self, issue_id: int) -> Issue:
         """Get an issue by its ID, including its location information."""
+        # stmt = (
+        #     select(Issue)
+        #     .options(joinedload(Issue.issue_location))
+        #     .where(Issue.issue_id == issue_id)
+        # )
         stmt = (
             select(Issue)
             .options(joinedload(Issue.issue_location))
+            .options(joinedload(Issue.attachments))
+            .options(joinedload(Issue.department))
+            .options(joinedload(Issue.reporter))
+            .options(joinedload(Issue.assignee))
             .where(Issue.issue_id == issue_id)
         )
         result = await self.db.execute(stmt)
