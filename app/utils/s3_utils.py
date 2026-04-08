@@ -28,6 +28,12 @@ def populate_attachment_urls(issue) -> None:
         attachment.path = s3.build_s3_url(attachment.path)
 
 
+def return_attachment_urls(issue) -> list[str]:
+    """Return a list of full S3 URLs for the issue's attachments."""
+    s3 = get_s3_service()
+    return [s3.build_s3_url(attachment.path) for attachment in issue.attachments]
+
+
 async def safe_upload_photos_to_s3(photos: list[UploadFile]) -> tuple[list[str], list[str]]:
     """
     Safely upload photos to S3, ensuring cleanup of temporary files and uploaded objects on failure.
