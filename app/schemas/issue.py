@@ -148,6 +148,7 @@ class IssueDetailResponse(BaseModel):
     assigned_to: Optional[str] = None
     created_at: str
     attachments: list[str]  # List of attachment URLs
+    rejected_reason: Optional[str] = None
     issue_location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
