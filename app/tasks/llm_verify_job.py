@@ -6,8 +6,8 @@ from app.core.logger import get_logger
 from app.services.llm_verification_service import (
     LLMVerificationService,
     VerificationResponse,
-    derive_review_decision,
 )
+from app.utils.decision_utils import derive_review_decision
 
 logger = get_logger("tasks.jobs")
 
@@ -17,7 +17,7 @@ async def llm_verify(
 ) -> Optional[VerificationResponse]:
     """Verify the issue using LLM inside a Celery worker."""
 
-    res = await LLMVerificationService.verify_with_mistral(
+    res = await LLMVerificationService.verify_images(
         issue_type=issue_type,
         issue_description=issue_description,
         image_urls=image_urls,

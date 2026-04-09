@@ -9,11 +9,10 @@ from app.repositories.issue_repo import IssueRepository
 from app.schemas.issue import IssueStatus
 from app.services.llm_verification_service import (
     VerificationResponse,
-    should_auto_accept,
-    should_reject,
 )
 from app.tasks.image_jobs import check_duplicate_using_phash
 from app.tasks.llm_verify_job import llm_verify
+from app.utils.decision_utils import should_auto_accept, should_reject
 from app.utils.s3_utils import return_attachment_urls
 
 logger = get_logger("tasks.jobs")
