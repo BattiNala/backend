@@ -564,4 +564,6 @@ async def get_issue(
     await authorize_issue_access(issue=issue, current_user=current_user, db=db)
     populate_attachment_urls(issue)
 
-    return wrap_issue_detail_response(issue)
+    temp = wrap_issue_detail_response(issue)
+    logger.info(json.dumps(temp.model_dump(), indent=2))
+    return temp

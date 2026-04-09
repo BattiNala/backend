@@ -90,6 +90,7 @@ class Issue(Base):  # pylint: disable=too-few-public-methods
     rejected_issues = relationship(
         "RejectedIssue",
         back_populates="issue",
+        uselist=False,
         cascade="all, delete-orphan",
         single_parent=True,
     )
