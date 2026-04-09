@@ -64,6 +64,12 @@ class Settings(BaseSettings):
         "road",
     ]
     MISTRAL_API_KEY: str = "api-key-placeholder"
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    GEMINI_STRICT_MODEL: str = "gemini-2.5-flash"
+    GEMINI_API_KEY: str = "api-key-placeholder"
+    GROQ_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    GROQ_STRICT_MODEL: str = "openai/gpt-oss-20b"
+    GROQ_API_KEY: str = "api-key-placeholder"
 
 
 settings = Settings()
