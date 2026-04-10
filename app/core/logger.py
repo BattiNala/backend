@@ -55,12 +55,23 @@ def setup_logging(level: int | str | None = None) -> logging.Logger:
         logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     )
 
-    file_handler = logging.handlers.RotatingFileHandler(
+    # file_handler = logging.handlers.RotatingFileHandler(
+    #     LOG_FILE,
+    #     maxBytes=10 * 1024 * 1024,
+    #     backupCount=5,
+    #     encoding="utf-8",
+    # )
+    file_handler = logging.handlers.TimedRotatingFileHandler(
         LOG_FILE,
-        maxBytes=10 * 1024 * 1024,
-        backupCount=5,
+        when="midnight",  # rotate at midnight
+        interval=1,  # every 1 day
+        backupCount=7,  # keep 7 days
         encoding="utf-8",
+        utc=False,
     )
+
+    # Add date suffix to rotated files
+    file_handler.suffix = "%Y-%m-%d"
     file_handler.setLevel(resolved_level)
     file_handler.setFormatter(
         logging.Formatter(

@@ -15,6 +15,7 @@ Cloudflare R2:
 
 from __future__ import annotations
 
+import mimetypes
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -142,6 +143,7 @@ class S3Service:
 
         ext: str = file_path.suffix
         now: datetime = datetime.now(timezone.utc)
+        mimetype: str = mimetypes.guess_type(file_path)[0] or "image/jpeg"
 
         object_key: str = f"{prefix}/{now:%Y/%m}/{uuid4().hex}{ext}"
 
@@ -153,6 +155,7 @@ class S3Service:
                 Bucket=self.bucket_name,
                 Key=object_key,
                 Body=body,
+                ContentType=mimetype,
             )
 
             return object_key
