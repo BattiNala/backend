@@ -30,6 +30,25 @@ class _FakeBody:
         self.closed = True
 
 
+class _FakeBodyWithSyncClose:
+    """Test double with a synchronous close method."""
+
+    def __init__(self, chunks):
+        """Init."""
+        self._chunks = list(chunks)
+        self.closed = False
+
+    async def read(self, _size):
+        """Read."""
+        if self._chunks:
+            return self._chunks.pop(0)
+        return b""
+
+    def close(self):
+        """Close."""
+        self.closed = True
+
+
 class _FakeClient:
     """Test double for FakeClient."""
 
@@ -92,6 +111,14 @@ class _AsyncFile:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("ab") as handle:
             handle.write(data)
+
+
+class _FakeClientSyncClose(_FakeClient):
+    """Test client returning a body with sync close semantics."""
+
+    async def get_object(self, **_kwargs):
+        """Get object."""
+        return {"Body": _FakeBodyWithSyncClose([b"sync ", b"close"])}
 
 
 def test_build_s3_url_supports_aws_and_custom_endpoints():
@@ -172,3 +199,17 @@ def test_upload_download_delete_list_and_presign(monkeypatch, tmp_path):
     assert deleted is True
     assert keys == ["images/1.png", "images/2.png"]
     assert presigned == "https://example.com/images/2024/01/abc123.png?expires=60"
+
+
+def test_download_file_supports_sync_stream_close(monkeypatch, tmp_path):
+    """Download should tolerate providers that expose a sync close method."""
+    service = S3Service(S3Config(bucket_name="bucket"))
+    service.client = _FakeClientSyncClose()
+    download_path = tmp_path / "downloads" / "photo.png"
+
+    monkeypatch.setattr("app.services.s3_service.aiofiles.open", _AsyncFile)
+
+    downloaded = asyncio.run(service.download_file("images/key.png", download_path))
+
+    assert downloaded is True
+    assert download_path.read_bytes() == b"sync close"

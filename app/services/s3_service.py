@@ -15,6 +15,7 @@ Cloudflare R2:
 
 from __future__ import annotations
 
+import inspect
 import mimetypes
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -190,7 +191,9 @@ class S3Service:
 
                     await f.write(chunk)
 
-            await stream.close()
+            close_result = stream.close()
+            if inspect.isawaitable(close_result):
+                await close_result
 
             return True
 
