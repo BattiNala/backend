@@ -347,3 +347,109 @@ def test_get_best_orb_match_between_issues_reuses_existing_local_paths(monkeypat
     download.assert_not_awaited()
     compute.assert_called_once_with(str(local_new), str(local_old))
     cleanup.assert_awaited_once_with([])
+
+
+def test_get_best_cosine_match_between_issues_downloads_s3_backed_attachments(
+    monkeypatch, tmp_path
+):
+    """Cosine comparison should resolve S3 object keys to local temp files first."""
+    downloaded_new = tmp_path / "new.jpg"
+    downloaded_old = tmp_path / "old.jpg"
+    downloaded_new.write_bytes(b"new")
+    downloaded_old.write_bytes(b"old")
+
+    new_issue = SimpleNamespace(
+        attachments=[SimpleNamespace(attachment_id=1, path="images/new.jpg")],
+    )
+    candidate_issue = SimpleNamespace(
+        attachments=[SimpleNamespace(attachment_id=2, path="images/old.jpg")],
+    )
+
+    async def _fake_download(object_key):
+        return str(downloaded_new if object_key == "images/new.jpg" else downloaded_old)
+
+    cleanup = AsyncMock()
+    compute = Mock(return_value={"similarity_score": 0.62})
+
+    monkeypatch.setattr(image_jobs, "download_s3_object_to_tempfile", _fake_download)
+    monkeypatch.setattr(image_jobs, "delete_temp_files", cleanup)
+    monkeypatch.setattr(
+        image_jobs.IssueImageValidationService,
+        "compute_cosine_similarity",
+        compute,
+    )
+
+    result = asyncio.run(
+        image_jobs.get_best_cosine_match_between_issues(new_issue, candidate_issue)
+    )
+
+    assert result == {
+        "new_attachment_id": 1,
+        "old_attachment_id": 2,
+        "similarity_score": 0.62,
+    }
+    compute.assert_called_once_with(str(downloaded_new), str(downloaded_old))
+    cleanup.assert_awaited_once_with([str(downloaded_new), str(downloaded_old)])
+
+
+def test_check_duplicate_using_phash_uses_cosine_as_third_fallback(monkeypatch):
+    """Cosine similarity should reject ambiguous duplicates when ORB falls short."""
+    new_issue = SimpleNamespace(
+        issue_id=10,
+        issue_label="ISS-10",
+        attachments=[SimpleNamespace(attachment_id=1, phash="new-hash", path="new.jpg")],
+        status=None,
+        duplicate_of_issue_id=None,
+    )
+    candidate_issue = SimpleNamespace(
+        issue_id=20,
+        issue_label="ISS-20",
+        attachments=[SimpleNamespace(attachment_id=2, phash="old-hash", path="old.jpg")],
+    )
+
+    issue_repo = Mock()
+    issue_repo.reject_issue = AsyncMock()
+    get_nearby = AsyncMock(return_value=[candidate_issue])
+    get_orb = AsyncMock(
+        return_value={
+            "new_attachment_id": 1,
+            "old_attachment_id": 2,
+            "good_matches": 12,
+            "similarity_score": 0.08,
+        }
+    )
+    get_cosine = AsyncMock(
+        return_value={
+            "new_attachment_id": 1,
+            "old_attachment_id": 2,
+            "similarity_score": 0.61,
+        }
+    )
+    assign = AsyncMock()
+
+    monkeypatch.setattr(image_jobs, "IssueRepository", lambda _db: issue_repo)
+    monkeypatch.setattr(
+        image_jobs.IssueProximityService,
+        "get_nearby_candidate_issues",
+        get_nearby,
+    )
+    monkeypatch.setattr(image_jobs.IssueImageValidationService, "phash_distance", lambda *_args: 6)
+    monkeypatch.setattr(image_jobs, "get_best_orb_match_between_issues", get_orb)
+    monkeypatch.setattr(image_jobs, "get_best_cosine_match_between_issues", get_cosine)
+    monkeypatch.setattr(image_jobs, "assign_issue_to_nearest_employee", assign)
+
+    asyncio.run(image_jobs.check_duplicate_using_phash(db=object(), new_issue=new_issue))
+
+    assert new_issue.status == IssueStatus.REJECTED
+    assert new_issue.duplicate_of_issue_id == 20
+    issue_repo.reject_issue.assert_awaited_once_with(
+        new_issue,
+        reason=(
+            "Duplicate issue detected with issue of label ISS-20"
+            " based on pHash distance 6 and cosine similarity score 0.61"
+        ),
+        auto_reject=True,
+    )
+    get_orb.assert_awaited_once_with(new_issue, candidate_issue)
+    get_cosine.assert_awaited_once_with(new_issue, candidate_issue)
+    assign.assert_not_awaited()

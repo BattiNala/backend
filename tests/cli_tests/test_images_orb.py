@@ -1,4 +1,4 @@
-"""CLI smoke test for pHash and ORB image similarity."""
+"""CLI smoke test for pHash, ORB, and cosine image similarity."""
 
 import json
 import sys
@@ -16,6 +16,7 @@ DEFAULT_IMAGE_2 = Path("tests/cli_tests/pole_2.jpg")
 def _resolve_image_paths() -> tuple[Path, Path]:
     """Return two image paths from CLI args or bundled defaults."""
     args = sys.argv[1:]
+
     if len(args) == 2:
         return Path(args[0]), Path(args[1])
     if not args:
@@ -24,7 +25,7 @@ def _resolve_image_paths() -> tuple[Path, Path]:
 
 
 def run_image_similarity_smoke_test() -> None:
-    """Compute pHash and ORB metrics for two local images."""
+    """Compute pHash, ORB, and cosine metrics for two local images."""
     image1, image2 = _resolve_image_paths()
 
     for image_path in (image1, image2):
@@ -35,6 +36,7 @@ def run_image_similarity_smoke_test() -> None:
     phash_2 = IssueImageValidationService.compute_phash(str(image2))
     phash_distance = IssueImageValidationService.phash_distance(phash_1, phash_2)
     orb_result = IssueImageValidationService.compute_orb_similarity(str(image1), str(image2))
+    cosine_result = IssueImageValidationService.compute_cosine_similarity(str(image1), str(image2))
 
     assert phash_1 is not None
     assert phash_2 is not None
@@ -43,6 +45,8 @@ def run_image_similarity_smoke_test() -> None:
     assert "good_matches" in orb_result
     assert "total_matches" in orb_result
     assert "similarity_score" in orb_result
+    assert isinstance(cosine_result, dict)
+    assert "similarity_score" in cosine_result
 
     result = {
         "image_1": str(image1),
@@ -54,6 +58,9 @@ def run_image_similarity_smoke_test() -> None:
             "good_matches": int(orb_result["good_matches"]),
             "total_matches": int(orb_result["total_matches"]),
             "similarity_score": float(orb_result["similarity_score"]),
+        },
+        "cosine_similarity": {
+            "similarity_score": float(cosine_result["similarity_score"]),
         },
     }
     print(json.dumps(result, indent=2))
