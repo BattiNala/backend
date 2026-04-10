@@ -74,7 +74,11 @@ from app.schemas.issue import (
     IssueTypesList,
 )
 from app.services.issue_validation_service import IssueImageValidationService
-from app.tasks.celery_jobs import assign_issue_to_nearest_employee_task, process_new_issue_task
+from app.tasks.celery_jobs import (
+    assign_issue_to_nearest_employee_task,
+    generate_issue_embeddings_task,
+    process_new_issue_task,
+)
 from app.utils.conversion import department_to_issue_type
 from app.utils.issue_utils import generate_issue_label
 from app.utils.return_wrappers.issues import wrap_issue_detail_response
@@ -256,6 +260,14 @@ async def create_anonymous_issue(
     finally:
         await delete_temp_files(temp_paths)
 
+    generate_issue_embeddings_task.delay(new_issue.issue_id)
+
+    logger.info(
+        "Queued attachment embedding task: issue_id=%s issue_label=%s",
+        new_issue.issue_id,
+        new_issue.issue_label,
+    )
+
     return AnonymousIssueCreateResponse(
         issue_label=new_issue.issue_label,
         status=new_issue.status,
@@ -318,7 +330,15 @@ async def create_issue(
     finally:
         await delete_temp_files(temp_paths)
 
+    generate_issue_embeddings_task.delay(new_issue.issue_id)
     process_new_issue_task.delay(new_issue.issue_id)
+
+    logger.info(
+        "Queued attachment embedding task: issue_id=%s issue_label=%s reporter_id=%s",
+        new_issue.issue_id,
+        new_issue.issue_label,
+        citizen_profile.citizen_id,
+    )
 
     logger.info(
         "Queued issue processing task: issue_id=%s issue_label=%s reporter_id=%s",
