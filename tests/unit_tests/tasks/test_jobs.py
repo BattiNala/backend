@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 from app.schemas.issue import IssueStatus
-from app.tasks import jobs, task_assign_job
+from app.tasks import image_jobs, jobs, task_assign_job
 
 
 class _Scalars:
@@ -264,3 +264,86 @@ def test_validate_issue_images_marks_manual_review(monkeypatch):
         issue,
         status=IssueStatus.PENDING_VERIFICATION,
     )
+
+
+def test_get_best_orb_match_between_issues_downloads_s3_backed_attachments(monkeypatch, tmp_path):
+    """ORB comparison should resolve S3 object keys to local temp files first."""
+    downloaded_new = tmp_path / "new.jpg"
+    downloaded_old = tmp_path / "old.jpg"
+    downloaded_new.write_bytes(b"new")
+    downloaded_old.write_bytes(b"old")
+
+    new_issue = SimpleNamespace(
+        attachments=[SimpleNamespace(attachment_id=1, path="images/new.jpg")],
+    )
+    candidate_issue = SimpleNamespace(
+        attachments=[SimpleNamespace(attachment_id=2, path="images/old.jpg")],
+    )
+
+    async def _fake_download(object_key):
+        return str(downloaded_new if object_key == "images/new.jpg" else downloaded_old)
+
+    cleanup = AsyncMock()
+    compute = Mock(
+        return_value={
+            "good_matches": 24,
+            "total_matches": 30,
+            "similarity_score": 0.31,
+        }
+    )
+
+    monkeypatch.setattr(image_jobs, "download_s3_object_to_tempfile", _fake_download)
+    monkeypatch.setattr(image_jobs, "delete_temp_files", cleanup)
+    monkeypatch.setattr(image_jobs.IssueImageValidationService, "compute_orb_similarity", compute)
+
+    result = asyncio.run(image_jobs.get_best_orb_match_between_issues(new_issue, candidate_issue))
+
+    assert result == {
+        "new_attachment_id": 1,
+        "old_attachment_id": 2,
+        "good_matches": 24,
+        "similarity_score": 0.31,
+    }
+    compute.assert_called_once_with(str(downloaded_new), str(downloaded_old))
+    cleanup.assert_awaited_once_with([str(downloaded_new), str(downloaded_old)])
+
+
+def test_get_best_orb_match_between_issues_reuses_existing_local_paths(monkeypatch, tmp_path):
+    """Existing local attachment paths should bypass storage downloads."""
+    local_new = tmp_path / "new.jpg"
+    local_old = tmp_path / "old.jpg"
+    local_new.write_bytes(b"new")
+    local_old.write_bytes(b"old")
+
+    new_issue = SimpleNamespace(
+        attachments=[SimpleNamespace(attachment_id=1, path=str(local_new))],
+    )
+    candidate_issue = SimpleNamespace(
+        attachments=[SimpleNamespace(attachment_id=2, path=str(local_old))],
+    )
+
+    cleanup = AsyncMock()
+    download = AsyncMock()
+    compute = Mock(
+        return_value={
+            "good_matches": 18,
+            "total_matches": 25,
+            "similarity_score": 0.2,
+        }
+    )
+
+    monkeypatch.setattr(image_jobs, "download_s3_object_to_tempfile", download)
+    monkeypatch.setattr(image_jobs, "delete_temp_files", cleanup)
+    monkeypatch.setattr(image_jobs.IssueImageValidationService, "compute_orb_similarity", compute)
+
+    result = asyncio.run(image_jobs.get_best_orb_match_between_issues(new_issue, candidate_issue))
+
+    assert result == {
+        "new_attachment_id": 1,
+        "old_attachment_id": 2,
+        "good_matches": 18,
+        "similarity_score": 0.2,
+    }
+    download.assert_not_awaited()
+    compute.assert_called_once_with(str(local_new), str(local_old))
+    cleanup.assert_awaited_once_with([])

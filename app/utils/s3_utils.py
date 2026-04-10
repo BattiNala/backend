@@ -11,6 +11,7 @@ import aiofiles.os
 from fastapi import HTTPException, UploadFile
 
 from app.core.logger import get_logger
+from app.exceptions.s3_exception import S3DownloadException
 from app.services.s3_service import S3Config, S3Service
 
 logger = get_logger("api.issues")
@@ -110,3 +111,24 @@ async def delete_uploaded_files(object_keys: list[str]) -> None:
     # pylint: disable=broad-exception-caught
     except Exception:
         logger.exception("Failed to clean up uploaded attachments: keys=%s", object_keys)
+
+
+async def download_s3_object_to_tempfile(object_key: str) -> str | None:
+    """Download an S3 object into a temporary file and return its local path."""
+    fd, temp_path = tempfile.mkstemp(suffix=Path(object_key).suffix or ".img")
+    os.close(fd)
+
+    try:
+        async with get_s3_service() as s3:
+            downloaded = await s3.download_file(object_key, Path(temp_path))
+
+        if not downloaded:
+            raise RuntimeError(f"Failed to download attachment: {object_key}")
+
+        return temp_path
+    except S3DownloadException as e:
+        await delete_temp_files([temp_path])
+        logger.exception(
+            "Failed to download attachment from storage: key=%s, error=%s", object_key, str(e)
+        )
+        return None

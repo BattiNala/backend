@@ -173,12 +173,9 @@ cython_debug/
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+# .idea/
 
-# Abstra
-# Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
-# Learn more at https://abstra.io/docs
+
 .abstra/
 
 # Visual Studio Code
@@ -194,10 +191,6 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
 
@@ -209,6 +202,9 @@ route_graph_cache.pkl
 
 
 tests/cli_tests/*.png
+tests/cli_tests/*.jpg
+tests/cli_tests/*.jpeg
+
 API_DOCS.md
 openapi.json
 employees.csv
