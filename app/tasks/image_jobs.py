@@ -18,6 +18,7 @@ logger = get_logger("tasks.image_jobs")
 ORB_MIN_GOOD_MATCHES = 20
 ORB_MIN_SIMILARITY_SCORE = 0.15
 HISTOGRAM_COSINE_MIN_SIMILARITY_SCORE = 0.55
+EMBEDDING_COSINE_MIN_SIMILARITY_SCORE = 0.55
 PHASH_STRONG_DUPLICATE_DISTANCE = 3
 
 
@@ -32,6 +33,14 @@ class OrbMatchResult(TypedDict):
 
 class CosineMatchResult(TypedDict):
     """Best cosine match metadata for a pair of attachments."""
+
+    new_attachment_id: int
+    old_attachment_id: int
+    similarity_score: float
+
+
+class EmbeddingCosineMatchResult(TypedDict):
+    """Best embedding cosine match metadata for a pair of attachments."""
 
     new_attachment_id: int
     old_attachment_id: int
@@ -155,6 +164,19 @@ async def _reject_similarity_duplicate(
         await _reject_duplicate_issue(issue_repo, new_issue, best_match, reason)
         return True
 
+    embedding_result = await get_best_embedding_cosine_match_between_issues(new_issue, best_match)
+    if (
+        embedding_result
+        and embedding_result["similarity_score"] >= EMBEDDING_COSINE_MIN_SIMILARITY_SCORE
+    ):
+        reason = (
+            f"Duplicate issue detected with issue of label {best_match.issue_label}"
+            f" based on pHash distance {best_distance} and embedding cosine similarity score "
+            f"{embedding_result['similarity_score']}"
+        )
+        await _reject_duplicate_issue(issue_repo, new_issue, best_match, reason)
+        return True
+
     return False
 
 
@@ -254,6 +276,42 @@ async def get_best_cosine_match_between_issues(
                     }
     finally:
         await delete_temp_files(new_temp_paths + old_temp_paths)
+
+    return best_result
+
+
+async def get_best_embedding_cosine_match_between_issues(
+    new_issue: Issue,
+    candidate_issue: Issue,
+) -> EmbeddingCosineMatchResult | None:
+    """Compute the best cosine similarity match between attachment embeddings."""
+    best_result: EmbeddingCosineMatchResult | None = None
+    best_similarity_score = float("-inf")
+
+    new_attachment: Attachment
+    old_attachment: Attachment
+    for new_attachment in new_issue.attachments:
+        new_embedding = getattr(new_attachment, "embedding", None)
+        if new_embedding is None:
+            continue
+
+        for old_attachment in candidate_issue.attachments:
+            old_embedding = getattr(old_attachment, "embedding", None)
+            if old_embedding is None:
+                continue
+
+            result = IssueImageValidationService.compute_embedding_cosine_similarity(
+                new_embedding,
+                old_embedding,
+            )
+
+            if result["similarity_score"] > best_similarity_score:
+                best_similarity_score = result["similarity_score"]
+                best_result = {
+                    "new_attachment_id": new_attachment.attachment_id,
+                    "old_attachment_id": old_attachment.attachment_id,
+                    "similarity_score": result["similarity_score"],
+                }
 
     return best_result
 

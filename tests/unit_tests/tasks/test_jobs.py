@@ -392,6 +392,50 @@ def test_get_best_cosine_match_between_issues_downloads_s3_backed_attachments(
     cleanup.assert_awaited_once_with([str(downloaded_new), str(downloaded_old)])
 
 
+def test_get_best_embedding_cosine_match_between_issues_uses_attachment_embeddings(
+    monkeypatch,
+):
+    """Embedding cosine comparison should use stored vectors directly."""
+    new_issue = SimpleNamespace(
+        attachments=[
+            SimpleNamespace(attachment_id=1, embedding=[0.1, 0.2, 0.3]),
+            SimpleNamespace(attachment_id=2, embedding=[0.9, 0.1, 0.0]),
+        ],
+    )
+    candidate_issue = SimpleNamespace(
+        attachments=[
+            SimpleNamespace(attachment_id=3, embedding=[0.11, 0.19, 0.31]),
+            SimpleNamespace(attachment_id=4, embedding=[0.0, 1.0, 0.0]),
+        ],
+    )
+
+    compute = Mock(
+        side_effect=[
+            {"similarity_score": 0.98},
+            {"similarity_score": 0.12},
+            {"similarity_score": 0.43},
+            {"similarity_score": 0.09},
+        ]
+    )
+
+    monkeypatch.setattr(
+        image_jobs.IssueImageValidationService,
+        "compute_embedding_cosine_similarity",
+        compute,
+    )
+
+    result = asyncio.run(
+        image_jobs.get_best_embedding_cosine_match_between_issues(new_issue, candidate_issue)
+    )
+
+    assert result == {
+        "new_attachment_id": 1,
+        "old_attachment_id": 3,
+        "similarity_score": 0.98,
+    }
+    assert compute.call_count == 4
+
+
 def test_check_duplicate_using_phash_uses_cosine_as_third_fallback(monkeypatch):
     """Cosine similarity should reject ambiguous duplicates when ORB falls short."""
     new_issue = SimpleNamespace(
@@ -436,6 +480,11 @@ def test_check_duplicate_using_phash_uses_cosine_as_third_fallback(monkeypatch):
     monkeypatch.setattr(image_jobs.IssueImageValidationService, "phash_distance", lambda *_args: 6)
     monkeypatch.setattr(image_jobs, "get_best_orb_match_between_issues", get_orb)
     monkeypatch.setattr(image_jobs, "get_best_cosine_match_between_issues", get_cosine)
+    monkeypatch.setattr(
+        image_jobs,
+        "get_best_embedding_cosine_match_between_issues",
+        AsyncMock(return_value=None),
+    )
     monkeypatch.setattr(image_jobs, "assign_issue_to_nearest_employee", assign)
 
     asyncio.run(image_jobs.check_duplicate_using_phash(db=object(), new_issue=new_issue))
@@ -452,4 +501,80 @@ def test_check_duplicate_using_phash_uses_cosine_as_third_fallback(monkeypatch):
     )
     get_orb.assert_awaited_once_with(new_issue, candidate_issue)
     get_cosine.assert_awaited_once_with(new_issue, candidate_issue)
+    assign.assert_not_awaited()
+
+
+def test_check_duplicate_using_phash_uses_embedding_cosine_as_final_fallback(monkeypatch):
+    """Embedding cosine should reject ambiguous duplicates when earlier checks fall short."""
+    new_issue = SimpleNamespace(
+        issue_id=11,
+        issue_label="ISS-11",
+        attachments=[SimpleNamespace(attachment_id=1, phash="new-hash", path="new.jpg")],
+        status=None,
+        duplicate_of_issue_id=None,
+    )
+    candidate_issue = SimpleNamespace(
+        issue_id=21,
+        issue_label="ISS-21",
+        attachments=[SimpleNamespace(attachment_id=2, phash="old-hash", path="old.jpg")],
+    )
+
+    issue_repo = Mock()
+    issue_repo.reject_issue = AsyncMock()
+    get_nearby = AsyncMock(return_value=[candidate_issue])
+    get_orb = AsyncMock(
+        return_value={
+            "new_attachment_id": 1,
+            "old_attachment_id": 2,
+            "good_matches": 9,
+            "similarity_score": 0.06,
+        }
+    )
+    get_cosine = AsyncMock(
+        return_value={
+            "new_attachment_id": 1,
+            "old_attachment_id": 2,
+            "similarity_score": 0.51,
+        }
+    )
+    get_embedding = AsyncMock(
+        return_value={
+            "new_attachment_id": 1,
+            "old_attachment_id": 2,
+            "similarity_score": 0.8779,
+        }
+    )
+    assign = AsyncMock()
+
+    monkeypatch.setattr(image_jobs, "IssueRepository", lambda _db: issue_repo)
+    monkeypatch.setattr(
+        image_jobs.IssueProximityService,
+        "get_nearby_candidate_issues",
+        get_nearby,
+    )
+    monkeypatch.setattr(image_jobs.IssueImageValidationService, "phash_distance", lambda *_args: 6)
+    monkeypatch.setattr(image_jobs, "get_best_orb_match_between_issues", get_orb)
+    monkeypatch.setattr(image_jobs, "get_best_cosine_match_between_issues", get_cosine)
+    monkeypatch.setattr(
+        image_jobs,
+        "get_best_embedding_cosine_match_between_issues",
+        get_embedding,
+    )
+    monkeypatch.setattr(image_jobs, "assign_issue_to_nearest_employee", assign)
+
+    asyncio.run(image_jobs.check_duplicate_using_phash(db=object(), new_issue=new_issue))
+
+    assert new_issue.status == IssueStatus.REJECTED
+    assert new_issue.duplicate_of_issue_id == 21
+    issue_repo.reject_issue.assert_awaited_once_with(
+        new_issue,
+        reason=(
+            "Duplicate issue detected with issue of label ISS-21"
+            " based on pHash distance 6 and embedding cosine similarity score 0.8779"
+        ),
+        auto_reject=True,
+    )
+    get_orb.assert_awaited_once_with(new_issue, candidate_issue)
+    get_cosine.assert_awaited_once_with(new_issue, candidate_issue)
+    get_embedding.assert_awaited_once_with(new_issue, candidate_issue)
     assign.assert_not_awaited()

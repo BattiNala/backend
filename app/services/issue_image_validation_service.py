@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Sequence, TypedDict
 
 import cv2  # pylint: disable=no-member
 import imagehash
@@ -119,6 +119,34 @@ class IssueImageValidationService:  # pylint: disable=too-few-public-methods
                 saturation_bins=saturation_bins,
             )
         except (cv2.error, OSError, ValueError, TypeError):
+            return IssueImageValidationService._empty_cosine_similarity_result()
+
+    @staticmethod
+    def compute_embedding_cosine_similarity(
+        embedding_1: Sequence[float] | None,
+        embedding_2: Sequence[float] | None,
+    ) -> CosineSimilarityResult:
+        """Compute cosine similarity between two embedding vectors."""
+        try:
+            if embedding_1 is None or embedding_2 is None:
+                return IssueImageValidationService._empty_cosine_similarity_result()
+
+            vector_1 = np.asarray(embedding_1, dtype=np.float32)
+            vector_2 = np.asarray(embedding_2, dtype=np.float32)
+
+            if vector_1.size == 0 or vector_2.size == 0 or vector_1.shape != vector_2.shape:
+                return IssueImageValidationService._empty_cosine_similarity_result()
+
+            norm_1 = float(np.linalg.norm(vector_1))
+            norm_2 = float(np.linalg.norm(vector_2))
+            if norm_1 == 0.0 or norm_2 == 0.0:
+                return IssueImageValidationService._empty_cosine_similarity_result()
+
+            similarity_score = float(np.dot(vector_1 / norm_1, vector_2 / norm_2))
+            return {
+                "similarity_score": round(similarity_score, 4),
+            }
+        except (ValueError, TypeError):
             return IssueImageValidationService._empty_cosine_similarity_result()
 
     @staticmethod

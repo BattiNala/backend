@@ -261,6 +261,7 @@ async def create_anonymous_issue(
         await delete_temp_files(temp_paths)
 
     generate_issue_embeddings_task.delay(new_issue.issue_id)
+    process_new_issue_task.delay(new_issue.issue_id)
 
     logger.info(
         "Queued attachment embedding task: issue_id=%s issue_label=%s",
