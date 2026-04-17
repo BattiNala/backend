@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-flash-latest"
     GEMINI_STRICT_MODEL: str = "gemini-2.5-flash"
     GEMINI_API_KEY: str = "api-key-placeholder"
+    GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2-preview"
+    GEMINI_EMBEDDING_DIMENSIONS: int = 1536
     GROQ_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
     GROQ_STRICT_MODEL: str = "openai/gpt-oss-20b"
     GROQ_API_KEY: str = "api-key-placeholder"

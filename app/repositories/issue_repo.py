@@ -17,7 +17,6 @@ from app.models.rejected_issue import RejectedIssue
 from app.schemas.attachment import AttachmentCreatePayload
 from app.schemas.employee import EmployeeActivityStatus
 from app.schemas.issue import (
-    AnonymousIssueCreate,
     IssueCreate,
     IssueListFilters,
     IssueListItem,
@@ -37,43 +36,18 @@ class IssueRepository:
         result = await self.db.execute(select(Issue).where(Issue.issue_label == issue_label))
         return result.scalars().first() is not None
 
-    async def create_anon_issue(
-        self,
-        issue_data: AnonymousIssueCreate,
-        issue_label: str,
-        attachments: list[AttachmentCreatePayload] | None = None,
-    ):
-        """Create a new anonymous issue in the database."""
-        new_issue = Issue(
-            issue_label=issue_label,
-            issue_type=issue_data.issue_type,
-            description=issue_data.description,
-            issue_priority=issue_data.issue_priority,
-            status=IssueStatus.PENDING_VERIFICATION,
-            is_anonymous=True,
-            issue_location=IssueLocation(
-                latitude=str(issue_data.latitude),
-                longitude=str(issue_data.longitude),
-                address=issue_data.issue_location,
-            ),
-            attachments=[
-                Attachment(path=attachment["path"], phash=attachment["phash"])
-                for attachment in (attachments or [])
-            ],
-        )
-        self.db.add(new_issue)
-        await self.db.flush()
-        await self.db.refresh(new_issue)
-        return new_issue
-
+    # pylint: disable=too-many-positional-arguments,too-many-arguments
     async def create_issue(
         self,
         issue_data: IssueCreate,
-        user_id: int,
+        user_id: int | None,
         issue_label: str,
         attachments: list[AttachmentCreatePayload] | None = None,
+        is_anonymous: bool = False,
     ) -> Issue:
         """Create a new issue in the database."""
+        if not is_anonymous and user_id is None:
+            raise ValueError("User ID is required for non-anonymous issues.")
         new_issue = Issue(
             issue_label=issue_label,
             issue_type=issue_data.issue_type,

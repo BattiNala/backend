@@ -3,6 +3,7 @@
 from functools import lru_cache
 
 from app.celery_app import celery_app
+from app.tasks.embedding_jobs import generate_issue_embeddings
 from app.tasks.jobs import process_issue
 from app.tasks.task_assign_job import assign_issue_to_nearest_employee
 
@@ -40,3 +41,14 @@ def assign_issue_to_nearest_employee_task(issue_id: int) -> None:
 def process_new_issue_task(issue_id: int):
     """Celery task wrapper for processing a new issue."""
     run_async(process_issue(issue_id))
+
+
+@celery_app.task(
+    name="app.tasks.generate_issue_embeddings",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def generate_issue_embeddings_task(issue_id: int) -> None:
+    """Celery task wrapper for generating issue attachment embeddings."""
+    run_async(generate_issue_embeddings(issue_id))

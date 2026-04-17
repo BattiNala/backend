@@ -27,10 +27,12 @@ async def llm_verify(
         decision = derive_review_decision(res.result)
 
         logger.info(
-            "LLM verification successful: issue_type=%s score=%s verdict=%s decision=%s",
+            "LLM verification successful:"
+            " issue_type=%s score=%s verdict=%s rationale=%s decision=%s",
             issue_type,
             res.result.score,
             res.result.verdict,
+            res.result.rationale,
             decision,
         )
         return res

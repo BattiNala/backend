@@ -17,6 +17,12 @@ def test_celery_imports_register_issue_processing_task():
     assert "app.tasks.process_new_issue" in celery_app.tasks
 
 
+def test_celery_imports_register_issue_embedding_task():
+    celery_app.loader.import_default_modules()
+
+    assert "app.tasks.generate_issue_embeddings" in celery_app.tasks
+
+
 def test_run_async_reuses_runner(monkeypatch):
     calls = []
 

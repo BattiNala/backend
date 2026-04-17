@@ -1,5 +1,6 @@
 """Attachment model definition."""
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -15,6 +16,9 @@ class Attachment(Base):  # pylint: disable=too-few-public-methods
     issue_id = Column(Integer, ForeignKey("issues.issue_id", ondelete="CASCADE"), nullable=False)
     path = Column(String(255), nullable=False)
     phash = Column(String(20), nullable=True)
+
+    embedding = Column(Vector(1536), nullable=True)
+    embedding_model = Column(String(100), nullable=True)
 
     issue = relationship("Issue", back_populates="attachments", foreign_keys=[issue_id])
 

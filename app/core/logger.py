@@ -3,11 +3,12 @@
 import logging
 import logging.handlers
 import os
+from datetime import datetime
 from pathlib import Path
 
 APP_LOGGER_NAME = "battinala-backend"
 LOG_DIR = Path(__file__).resolve().parents[2] / "logs"
-LOG_FILE = LOG_DIR / "app.log"
+LOG_FILE = LOG_DIR / f"app_{datetime.now().strftime('%Y-%m-%d')}.log"
 
 
 LEVEL_NAMES = {
@@ -70,8 +71,6 @@ def setup_logging(level: int | str | None = None) -> logging.Logger:
         utc=False,
     )
 
-    # Add date suffix to rotated files
-    file_handler.suffix = "%Y-%m-%d"
     file_handler.setLevel(resolved_level)
     file_handler.setFormatter(
         logging.Formatter(

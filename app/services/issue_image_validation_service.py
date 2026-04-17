@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Sequence, TypedDict
 
 import cv2  # pylint: disable=no-member
 import imagehash
@@ -16,6 +16,12 @@ class ORBSimilarityResult(TypedDict):  # pylint: disable=too-few-public-methods
 
     good_matches: int
     total_matches: int
+    similarity_score: float
+
+
+class CosineSimilarityResult(TypedDict):  # pylint: disable=too-few-public-methods
+    """Structured result for cosine-based image similarity."""
+
     similarity_score: float
 
 
@@ -51,9 +57,21 @@ class IssueImageValidationService:  # pylint: disable=too-few-public-methods
         }
 
     @staticmethod
+    def _empty_cosine_similarity_result() -> CosineSimilarityResult:
+        """Return a default cosine similarity result."""
+        return {
+            "similarity_score": 0.0,
+        }
+
+    @staticmethod
     def _load_grayscale_image(image_path: str) -> NDArray[np.uint8] | None:
         """Load an image in grayscale mode."""
         return cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+
+    @staticmethod
+    def _load_color_image(image_path: str) -> NDArray[np.uint8] | None:
+        """Load an image in color mode."""
+        return cv2.imread(image_path, cv2.IMREAD_COLOR)
 
     @staticmethod
     def compute_orb_similarity(
@@ -78,6 +96,58 @@ class IssueImageValidationService:  # pylint: disable=too-few-public-methods
             )
         except (cv2.error, OSError, ValueError, TypeError):
             return IssueImageValidationService._empty_similarity_result()
+
+    @staticmethod
+    def compute_cosine_similarity(
+        image_path_1: str,
+        image_path_2: str,
+        hue_bins: int = 24,
+        saturation_bins: int = 16,
+    ) -> CosineSimilarityResult:
+        """Compute cosine similarity between normalized HSV histograms."""
+        try:
+            img1 = IssueImageValidationService._load_color_image(image_path_1)
+            img2 = IssueImageValidationService._load_color_image(image_path_2)
+
+            if img1 is None or img2 is None:
+                return IssueImageValidationService._empty_cosine_similarity_result()
+
+            return IssueImageValidationService._compare_hsv_histograms(
+                img1=img1,
+                img2=img2,
+                hue_bins=hue_bins,
+                saturation_bins=saturation_bins,
+            )
+        except (cv2.error, OSError, ValueError, TypeError):
+            return IssueImageValidationService._empty_cosine_similarity_result()
+
+    @staticmethod
+    def compute_embedding_cosine_similarity(
+        embedding_1: Sequence[float] | None,
+        embedding_2: Sequence[float] | None,
+    ) -> CosineSimilarityResult:
+        """Compute cosine similarity between two embedding vectors."""
+        try:
+            if embedding_1 is None or embedding_2 is None:
+                return IssueImageValidationService._empty_cosine_similarity_result()
+
+            vector_1 = np.asarray(embedding_1, dtype=np.float32)
+            vector_2 = np.asarray(embedding_2, dtype=np.float32)
+
+            if vector_1.size == 0 or vector_2.size == 0 or vector_1.shape != vector_2.shape:
+                return IssueImageValidationService._empty_cosine_similarity_result()
+
+            norm_1 = float(np.linalg.norm(vector_1))
+            norm_2 = float(np.linalg.norm(vector_2))
+            if norm_1 == 0.0 or norm_2 == 0.0:
+                return IssueImageValidationService._empty_cosine_similarity_result()
+
+            similarity_score = float(np.dot(vector_1 / norm_1, vector_2 / norm_2))
+            return {
+                "similarity_score": round(similarity_score, 4),
+            }
+        except (ValueError, TypeError):
+            return IssueImageValidationService._empty_cosine_similarity_result()
 
     @staticmethod
     def _match_orb_features(
@@ -115,3 +185,54 @@ class IssueImageValidationService:  # pylint: disable=too-few-public-methods
             "total_matches": total_matches,
             "similarity_score": round(similarity_score, 4),
         }
+
+    @staticmethod
+    def _compare_hsv_histograms(
+        img1: NDArray[np.uint8],
+        img2: NDArray[np.uint8],
+        hue_bins: int,
+        saturation_bins: int,
+    ) -> CosineSimilarityResult:
+        """Build normalized HSV histograms and compare them with cosine similarity."""
+        histogram_1 = IssueImageValidationService._normalized_hsv_histogram(
+            img1,
+            hue_bins=hue_bins,
+            saturation_bins=saturation_bins,
+        )
+        histogram_2 = IssueImageValidationService._normalized_hsv_histogram(
+            img2,
+            hue_bins=hue_bins,
+            saturation_bins=saturation_bins,
+        )
+
+        if histogram_1.size == 0 or histogram_2.size == 0:
+            return IssueImageValidationService._empty_cosine_similarity_result()
+
+        similarity_score = float(np.dot(histogram_1, histogram_2))
+
+        return {
+            "similarity_score": round(similarity_score, 4),
+        }
+
+    @staticmethod
+    def _normalized_hsv_histogram(
+        image: NDArray[np.uint8],
+        hue_bins: int,
+        saturation_bins: int,
+    ) -> NDArray[np.float32]:
+        """Return a unit-length HSV histogram for cosine comparison."""
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        histogram = cv2.calcHist(
+            [hsv_image],
+            [0, 1],
+            None,
+            [hue_bins, saturation_bins],
+            [0, 180, 0, 256],
+        )
+
+        flattened = histogram.astype(np.float32).reshape(-1)
+        norm = np.linalg.norm(flattened)
+        if norm == 0.0:
+            return np.array([], dtype=np.float32)
+
+        return flattened / norm

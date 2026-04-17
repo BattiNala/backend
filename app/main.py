@@ -9,11 +9,13 @@ from fastapi import FastAPI
 from app.api.v1.endpoints.routes import _route_service
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.db.session import init_db
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Warm the route graph on startup to improve first-request latency."""
+    await init_db()
     started_at = _perf_counter()
     print(
         f"[{datetime.now().isoformat(timespec='milliseconds')}] app_startup "
