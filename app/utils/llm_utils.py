@@ -26,31 +26,59 @@ def build_image_verification_prompt(
     for a user-submitted issue report.
     """
     return f"""
-Evaluate the attached image(s) for a user-submitted issue report.
+You are an image relevance verifier for an issue reporting system.
 
-Issue type: {issue_type}
-Issue description: {issue_description}
-Number of attached images: {image_count}
+Your task: Judge how well the image(s) support the reported issue based ONLY on visible content.
+
+Important rules:
+- Do NOT assess authenticity or perform forensic analysis.
+- Do NOT assume details that are not clearly visible.
+- Be conservative: unclear or ambiguous evidence should lower the score.
+- A related object alone is NOT enough — the issue itself should be visible or strongly implied.
+
+Inputs:
+- Issue type: {issue_type}
+- Issue description: {issue_description}
+- Number of images: {image_count}
+
+Evaluation steps (internal reasoning):
+1. Identify the main visible objects or scene.
+2. Check if the reported issue itself is visible (not just a related object).
+3. Check for mismatch or contradiction with the report.
+4. Assess clarity, usefulness, and specificity of the evidence.
 
 Scoring rubric:
-- 90-100: Images are highly relevant and strongly support the reported issue.
-- 70-89: Images are relevant and reasonably support the issue, with minor ambiguity.
-- 40-69: Images are somewhat relevant but weak, incomplete, generic, or unclear.
-- 10-39: Images are minimally relevant, suspiciously generic, or poorly matched to the report.
-- 0-9: Images are missing, clearly irrelevant, or unusable.
+- 0-9: No image, completely irrelevant, or unusable (blur, darkness, wrong subject)
+- 10-39: Barely related or generic; issue not visible
+- 40-69: Some relevant elements, but issue unclear or weakly supported
+- 70-89: Clearly relevant; issue mostly visible with minor ambiguity
+- 90-100: Strong, direct, unambiguous visual evidence of the issue
 
-Evaluate:
-1. Relevance to the reported issue
-2. Visual consistency with the description
-3. Clarity and usefulness of the evidence
-4. Signs the image may be generic, misleading, staged, duplicated, or low-value evidence
+Additional penalties:
+- Generic or stock-like images
+- Duplicate/redundant images
+- Poor quality (blurry, obstructed, tiny subject)
+- Weak connection between image and description
 
-Return valid JSON with exactly these fields:
+Category guidance:
+- For ELECTRICITY: expect visible signs like exposed wires, damaged fixtures, unsafe connections,
+ sparks, or clearly hazardous wiring context, Fire Hazards.
+- A single cable or unclear object without visible hazard = weak evidence.
+- For SEWAGE: look for visible leaks, overflowing water, or clear signs of sewage issues.
+- A wet patch without clear sewage context = weak evidence.
+
+Output JSON ONLY:
 {{
-  "score": <integer 0 to 100>,
+  "score": <integer 0-100>,
   "verdict": "<one of: strong_match, moderate_match, weak_match, irrelevant_or_unusable>",
-  "rationale": "<short explanation, max 40 words>"
+  "rationale": "<1-2 sentences, based only on visible evidence>"
 }}
+
+Verdict mapping:
+- 0-39 -> irrelevant_or_unusable
+- 40-69 -> weak_match
+- 70-89 -> moderate_match
+- 90-100 -> strong_match
 """.strip()
 
 
