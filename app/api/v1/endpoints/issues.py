@@ -187,6 +187,11 @@ async def get_issue_types(db: AsyncSession = Depends(get_db)):
 
 
 @issue_router.get(
+    "",
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
+@issue_router.get(
     "/",
     status_code=status.HTTP_200_OK,
     summary="List Issues with Filters",
@@ -233,24 +238,29 @@ async def create_anonymous_issue(
     validate_photos(photos)
     issue_create_obj = _parse_issue_create(issue_create, AnonymousIssueCreate)
 
-    attachment_paths: list[str] = []
+    attachment_payloads, attachment_paths, temp_paths = await _build_attachment_payloads(photos)
+
     temp_paths: list[str] = []
     try:
         attachment_paths, temp_paths = await _safe_upload_photos_to_s3(photos)
 
         issue_repo = IssueRepository(db)
         issue_label = await generate_unique_issue_label(issue_repo)
-        new_issue: Issue = await issue_repo.create_anon_issue(
+        new_issue: Issue = await issue_repo.create_issue(
             issue_create_obj,
-            issue_label,
-            attachment_paths,
+            user_id=None,
+            issue_label=issue_label,
+            attachments=attachment_payloads,
+            is_anonymous=True,
         )
         await db.commit()
-    except HTTPException:
+    except HTTPException as e:
+        logger.error("Anonymous issue creation failed with HTTPException: %s", e.detail)
         await db.rollback()
         await delete_uploaded_files(attachment_paths)
         raise
     except Exception as e:
+        logger.error("Anonymous issue creation failed with Exception: %s", e, exc_info=True)
         await db.rollback()
         await delete_uploaded_files(attachment_paths)
         raise HTTPException(
@@ -311,6 +321,7 @@ async def create_issue(
             citizen_profile.citizen_id,
             issue_label,
             attachment_payloads,
+            is_anonymous=False,
         )
 
         await context.db.commit()
