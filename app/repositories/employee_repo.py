@@ -59,6 +59,14 @@ class EmployeeRepository:
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
+    async def get_all_employees(self) -> list[Employee]:
+        """Get all employees across all departments."""
+        stmt = select(Employee).options(
+            joinedload(Employee.team), joinedload(Employee.department)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
     async def update_employee_status(self, employee: Employee, new_status: str) -> Employee:
         """Update the status of an employee."""
         employee.current_status = new_status

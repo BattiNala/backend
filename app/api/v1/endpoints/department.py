@@ -173,3 +173,19 @@ async def list_department_employees(
         raise HTTPException(status_code=404, detail="Employee not found")
     result = await employee_repo.get_employees_by_department(current_employee.department_id)
     return [wrap_employee_profile(employee) for employee in result]
+
+
+@department_router.get(
+    "/all-employees",
+    response_model=list[EmployeeProfile],
+    dependencies=[Depends(require_superadmin)],
+    summary="List all employees",
+    description="List all employees across all departments (superadmin only).",
+)
+async def list_all_employees(
+    db: AsyncSession = Depends(get_db),
+) -> list[EmployeeProfile]:
+    """List all employees in the system (superadmin only)."""
+    employee_repo = EmployeeRepository(db)
+    result = await employee_repo.get_all_employees()
+    return [wrap_employee_profile(employee) for employee in result]
