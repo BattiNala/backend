@@ -279,6 +279,12 @@ async def create_anonymous_issue(
         new_issue.issue_label,
     )
 
+    logger.info(
+        "Queued issue processing task: issue_id=%s issue_label=%s",
+        new_issue.issue_id,
+        new_issue.issue_label,
+    )
+
     return AnonymousIssueCreateResponse(
         issue_label=new_issue.issue_label,
         status=new_issue.status,
