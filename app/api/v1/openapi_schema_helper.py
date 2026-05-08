@@ -9,6 +9,11 @@ from app.schemas.issue import (
     IssueCreate,
 )
 
+anon_issue_example = AnonymousIssueCreate.model_config.get("json_schema_extra", {}).get(
+    "example", {}
+)
+issue_create_example = IssueCreate.model_config.get("json_schema_extra", {}).get("example", {})
+
 OPENAPI_ANON_ISSUE_SCHEMA = {
     "requestBody": {
         "content": {
