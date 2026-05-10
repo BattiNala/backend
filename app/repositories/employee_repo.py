@@ -60,9 +60,10 @@ class EmployeeRepository:
         return result.scalars().all()
 
     async def get_all_employees(self) -> list[Employee]:
-        """Get all employees across all departments."""
-        stmt = select(Employee).options(
-            joinedload(Employee.team), joinedload(Employee.department)
+        """Get all employees in the system across all departments."""
+        stmt = (
+            select(Employee)
+            .options(joinedload(Employee.team), joinedload(Employee.department))
         )
         result = await self.db.execute(stmt)
         return result.scalars().all()
