@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    analytics,
     auth,
     department,
     employee,
@@ -25,3 +26,4 @@ api_router.include_router(team.team_router, prefix="/team", tags=["team"])
 api_router.include_router(employee.employee_router, prefix="/employee", tags=["employee"])
 api_router.include_router(routes.router, prefix="/routes", tags=["routes"])
 api_router.include_router(superadmin.superadmin_router, prefix="/superadmin", tags=["superadmin"])
+api_router.include_router(analytics.analytics_router, prefix="/analytics", tags=["analytics"])
