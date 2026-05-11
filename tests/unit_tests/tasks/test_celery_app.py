@@ -83,7 +83,7 @@ def test_celery_app_log_formats_are_set():
     assert celery_app.conf.task_log_format == "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
-def test_celery_task_logger_emits_logs(caplog):
+def test_celery_task_logger_emits_logs(capsys):
     """Test that a Celery task actually emits logs when run eagerly."""
     # Initialize logging for the test context
     setup_logging()
@@ -100,12 +100,12 @@ def test_celery_task_logger_emits_logs(caplog):
         logger.info("Test log message from Celery task")
         return "done"
 
-    # Run the task eagerly (without worker) and capture logs
-    with caplog.at_level(logging.INFO):
-        result = test_logging_task.apply(args=(), kwargs={}).get()
+    # Run the task eagerly (without worker)
+    result = test_logging_task.apply(args=(), kwargs={}).get()
 
     assert result == "done"
-    # Check that our log message was captured
-    assert any("Test log message from Celery task" in record.message for record in caplog.records)
-    # Also check that it came from the right logger
-    assert any(record.name == "battinala-backend.test" for record in caplog.records)
+    # The app logger has propagate=False and a StreamHandler writing to stderr,
+    # so we capture stderr output instead of using caplog.
+    stderr = capsys.readouterr().err
+    assert "Test log message from Celery task" in stderr
+    assert "battinala-backend.test" in stderr

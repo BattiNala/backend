@@ -2,7 +2,7 @@
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import ANY, AsyncMock, Mock
 
 from app.schemas.issue import IssueStatus
 from app.tasks import image_jobs, jobs, task_assign_job
@@ -109,13 +109,14 @@ def test_assign_issue_to_nearest_employee_logs_successful_assignment(monkeypatch
     info.assert_any_call(
         (
             "Issue auto-assigned successfully: issue_id=%s issue_label=%s "
-            "employee_id=%s team_id=%s department_id=%s"
+            "employee_id=%s team_id=%s department_id=%s duration=%.3fs"
         ),
         17,
         "ISS-17",
         12,
         9,
         4,
+        ANY,
     )
 
 
