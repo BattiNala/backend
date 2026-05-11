@@ -32,7 +32,8 @@ async def validate_issue_images(issue_repo: IssueRepository, new_issue: Issue | 
             "LLM verification failed for issue_id=%s, skipping validation",
             new_issue.issue_id,
         )
-        return None
+        await issue_repo.update_issue_status(new_issue, status=IssueStatus.PENDING_VERIFICATION)
+        return "manual_review"
 
     if should_auto_accept(res.result):
         return "accepted"

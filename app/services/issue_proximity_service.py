@@ -4,11 +4,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.logger import get_logger
 from app.models.issue import Issue
 from app.models.issue_location import IssueLocation
 from app.routing.haversine import haversine
 from app.schemas.geo_location import GeoLocation
 from app.schemas.issue import IssueStatus
+
+logger = get_logger("services.issue_proximity_service")
 
 
 class IssueProximityService:  # pylint: disable=too-few-public-methods
@@ -66,7 +69,14 @@ class IssueProximityService:  # pylint: disable=too-few-public-methods
             candidate_lon: float = float(candidate.issue_location.longitude)
             candidate_location = GeoLocation(latitude=candidate_lat, longitude=candidate_lon)
 
-            distance_m: float = haversine(source_location, candidate_location)
+            # convert haversine distance to meters
+            distance_m: float = haversine(source_location, candidate_location) * 1000
+            logger.info(
+                "Calculated distance between issue_id=%s and candidate_id=%s is %.2f meters",
+                issue.issue_id,
+                candidate.issue_id,
+                distance_m,
+            )
 
             if distance_m <= radius_meters:
                 nearby.append((candidate, distance_m))
