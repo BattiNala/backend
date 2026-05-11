@@ -1,7 +1,7 @@
 """Issue endpoints."""
 
 import json
-from typing import List, Type, TypeVar
+from typing import Annotated, List, Type, TypeVar
 
 from fastapi import (
     APIRouter,
@@ -25,6 +25,8 @@ from app.api.v1.dependencies import (
 from app.api.v1.openapi_schema_helper import (
     OPENAPI_ANON_ISSUE_SCHEMA,
     OPENAPI_ISSUE_CREATE_SCHEMA,
+    anon_issue_example,
+    issue_create_example,
 )
 
 # scoping helper functions
@@ -225,12 +227,25 @@ async def list_issues(
 )
 async def create_anonymous_issue(
     request: Request,
-    photos: list[UploadFile] = File(...),
-    issue_create: str = Form(
-        ...,
-        description="JSON string for anonymous issue creation. "
-        "Should match the AnonymousIssueCreate schema.",
-    ),
+    photos: Annotated[
+        list[UploadFile],
+        File(description="List of photo files to upload."),
+    ],
+    issue_create: Annotated[
+        str,
+        Form(
+            description=(  # pylint: disable=consider-using-f-string
+                "JSON string matching AnonymousIssueCreate schema.<br/><br/>"
+                "<b>Example value:</b><br/>"
+                "<pre>{}</pre>"
+            ).format(
+                json.dumps(anon_issue_example, indent=2)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            ),
+        ),
+    ],
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new anonymous issue."""
@@ -300,8 +315,25 @@ async def create_anonymous_issue(
 )
 async def create_issue(
     request: Request,
-    photos: list[UploadFile] = File(...),
-    issue_create: str = Form(...),
+    photos: Annotated[
+        list[UploadFile],
+        File(description="List of photo files to upload."),
+    ],
+    issue_create: Annotated[
+        str,
+        Form(
+            description=(  # pylint: disable=consider-using-f-string
+                "JSON string matching IssueCreate schema.<br/><br/>"
+                "<b>Example value:</b><br/>"
+                "<pre>{}</pre>"
+            ).format(
+                json.dumps(issue_create_example, indent=2)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            ),
+        ),
+    ],
     context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
 ):
     """Create a new issue with user association."""
@@ -372,7 +404,13 @@ async def create_issue(
     )
 
 
-@issue_router.get("/my-issues", status_code=status.HTTP_200_OK)
+@issue_router.get(
+    "/my-issues",
+    status_code=status.HTTP_200_OK,
+    response_model=IssueListResponse,
+    summary="Get My Issues",
+    description="Return issues visible to the current user within their role scope.",
+)
 async def get_my_issues(
     filters: IssueListFilters = Depends(get_issue_list_filters),
     context: IssueEndpointContext = Depends(_get_issue_endpoint_context),
@@ -602,6 +640,4 @@ async def get_issue(
     await authorize_issue_access(issue=issue, current_user=current_user, db=db)
     populate_attachment_urls(issue)
 
-    temp = wrap_issue_detail_response(issue)
-    logger.info(json.dumps(temp.model_dump(), indent=2))
-    return temp
+    return wrap_issue_detail_response(issue)

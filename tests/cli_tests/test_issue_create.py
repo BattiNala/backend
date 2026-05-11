@@ -6,7 +6,7 @@ import httpx
 
 BASE_URL = "http://localhost:8000"
 ISSUE_URL = f"{BASE_URL}/api/v1/issues/create"
-ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozMDMsImV4cCI6MTc3NTY1NTY1N30.nhapX2cEhyGZyIBes8BOeykanUpQXtFAuUU5Kd3De1M"  # noqa: E501
+ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozMDMsImV4cCI6MTc3ODQxMTEwNn0.fpo-jY_WK-dAuwfHlDM3_W1rrtURYiEb3TagPTVjHdE"  # noqa: E501
 headers = {
     "accept": "application/json",
     "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -19,13 +19,13 @@ headers["User-Agent"] = useragent
 files = [
     (
         "photos",
-        ("STEP_2.png", open("tests/cli_tests/img.png", "rb"), "image/png"),
+        ("STEP_2.png", open("tests/cli_tests/pole_1.jpg", "rb"), "image/png"),
     ),
     (
         "issue_create",
         (
             None,
-            '{"issue_type":1,"description":"tangled wires","contact_no":"999999999","issue_location":"thamel","latitude":27.6747791,"longitude":85.3044442}',  # noqa: E501
+            '{"issue_type":1,"description":"tangled wires","contact_no":"999999999","issue_location":"thamel", "latitude": 27.6847791, "longitude": 85.3144442}',  # noqa: E501
             "application/json",
         ),
     ),

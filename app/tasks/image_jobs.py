@@ -59,6 +59,9 @@ async def check_duplicate_using_phash(db, new_issue: Issue) -> None:
 
     if not nearby_issues:
         new_issue.status = IssueStatus.OPEN
+        # No nearby issues to consider as duplicates — proceed to assign the
+        # issue to the nearest available employee.
+        await assign_issue_to_nearest_employee(issue_id=new_issue.issue_id)
         return
 
     best_match, best_distance = _find_best_phash_match(new_issue, nearby_issues)
