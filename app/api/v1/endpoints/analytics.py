@@ -10,9 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.dependencies import require_department_admin, require_superadmin
 from app.db.session import get_db
 from app.models.department import Department
+from app.models.employee import Employee
 from app.models.team import Team
 from app.models.user import User
 from app.repositories.analytics_repo import AnalyticsRepository
+from app.repositories.employee_repo import EmployeeRepository
 from app.schemas.analytics import (
     DashboardSummaryResponse,
     DepartmentAnalyticsResponse,
@@ -161,6 +163,7 @@ async def get_team_analytics(
     _current_user: User = Depends(require_department_admin),
 ):
     """Get team workload analytics."""
+
     repo = AnalyticsRepository(db)
     teams = await repo.get_team_analytics(department_id=department_id)
     return TeamAnalyticsResponse(teams=teams, total_teams=len(teams))
@@ -176,11 +179,19 @@ async def get_team_analytics(
 async def get_top_employees(
     limit: int = Query(10, ge=1, le=50, description="Number of top employees"),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_department_admin),
+    current_user: User = Depends(require_department_admin),
 ):
     """Get top performing employees."""
+    employee_repo = EmployeeRepository(db)
+    current_employee: Employee | None = await employee_repo.get_employee_by_user_id(
+        user_id=current_user.user_id
+    )
     repo = AnalyticsRepository(db)
-    employees = await repo.get_top_employees(limit=limit)
+    if current_employee:
+        user_department = current_employee.department_id
+        employees = await repo.get_top_employees(limit=limit, department_id=user_department)
+    else:
+        employees = await repo.get_top_employees(limit=limit)
     return TopPerformingEmployeesResponse(employees=employees)
 
 
@@ -194,11 +205,19 @@ async def get_top_employees(
 async def get_top_teams(
     limit: int = Query(10, ge=1, le=50, description="Number of top teams"),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_department_admin),
+    current_user: User = Depends(require_department_admin),
 ):
     """Get top performing teams."""
+    employee_repo = EmployeeRepository(db)
+    current_employee: Employee | None = await employee_repo.get_employee_by_user_id(
+        user_id=current_user.user_id
+    )
     repo = AnalyticsRepository(db)
-    teams = await repo.get_top_teams(limit=limit)
+    if current_employee:
+        user_department = current_employee.department_id
+        teams = await repo.get_top_teams(limit=limit, department_id=user_department)
+    else:
+        teams = await repo.get_top_teams(limit=limit)
     return TopPerformingTeamsResponse(teams=teams)
 
 
