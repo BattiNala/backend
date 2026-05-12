@@ -285,15 +285,17 @@ class AnalyticsRepository:
 
         return teams
 
-    async def get_top_employees(self, limit: int = 10) -> list[dict]:
+    async def get_top_employees(
+        self, limit: int = 10, department_id: int | None = None
+    ) -> list[dict]:
         """Get top performing employees by resolution rate."""
-        employees = await self.get_employee_analytics()
+        employees = await self.get_employee_analytics(department_id=department_id)
         employees.sort(key=lambda e: e["resolution_rate"], reverse=True)
         return employees[:limit]
 
-    async def get_top_teams(self, limit: int = 10) -> list[dict]:
+    async def get_top_teams(self, limit: int = 10, department_id: int | None = None) -> list[dict]:
         """Get top performing teams by resolved issues."""
-        teams = await self.get_team_analytics()
+        teams = await self.get_team_analytics(department_id=department_id)
 
         for team in teams:
             stmt = (
