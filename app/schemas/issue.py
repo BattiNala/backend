@@ -146,6 +146,7 @@ class IssueDetailResponse(BaseModel):
     status: IssueStatus
     issue_priority: IssuePriority
     assigned_to: Optional[str] = None
+    reported_by: Optional[str] = None
     created_at: str
     attachments: list[str]  # List of attachment URLs
     rejected_reason: Optional[str] = None

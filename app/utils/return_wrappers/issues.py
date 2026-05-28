@@ -25,6 +25,7 @@ def wrap_issue_detail_response(issue: Issue):
         description=issue.description,
         status=issue.status,
         issue_priority=issue.issue_priority,
+        reported_by=issue.reporter.name if issue.reporter else None,
         assigned_to=issue.assignee.name if issue.assignee else None,
         created_at=str(utc_to_timezone(issue.created_at)),
         attachments=[attachment.path for attachment in issue.attachments],
