@@ -115,6 +115,7 @@ class IssueRepository:
             .options(joinedload(Issue.reporter))
             .options(joinedload(Issue.assignee))
             .options(joinedload(Issue.rejected_issues))
+            .options(joinedload(Issue.reported_issue_reports))
             .where(Issue.issue_label == issue_label)
         )
         result = await self.db.execute(stmt)

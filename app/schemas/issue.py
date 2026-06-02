@@ -150,6 +150,7 @@ class IssueDetailResponse(BaseModel):
     created_at: str
     attachments: list[str]  # List of attachment URLs
     rejected_reason: Optional[str] = None
+    reported_reason: Optional[str] = None
     issue_location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -200,3 +201,11 @@ class IssueListFilters:
     department_id: int | None = None
     assignee_id: int | None = None
     reporter_id: int | None = None
+
+
+class IssueReportedResponse(BaseModel):
+    """Response model for reporting an issue."""
+
+    message: str
+    issue_label: str
+    status: IssueStatus

@@ -20,6 +20,7 @@ def _build_issue(rejected_issues):
         attachments=[SimpleNamespace(path="/tmp/photo.jpg")],
         issue_location=SimpleNamespace(address="Main St", latitude=27.7, longitude=85.3),
         rejected_issues=rejected_issues,
+        reported_reason=None,
     )
 
 

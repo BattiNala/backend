@@ -70,6 +70,7 @@ from app.schemas.issue import (
     IssuePriorityOptionsResponse,
     IssueRejectRequest,
     IssueRejectResponse,
+    IssueReportedResponse,
     IssueReportRequest,
     IssueStatus,
     IssueStatusUpdate,
@@ -531,6 +532,8 @@ async def resolve_issue_by_staff(
 @issue_router.post(
     "/report-false",
     status_code=status.HTTP_200_OK,
+    response_model=IssueReportedResponse,
+    description="Report an issue as false (staff only). ",
 )
 async def report_false_issue(
     payload: IssueReportRequest,
@@ -571,7 +574,11 @@ async def report_false_issue(
 
         await db.commit()
 
-        return {"message": "Issue reported as false."}
+        return IssueReportedResponse(
+            message="Issue reported as false.",
+            status=IssueStatus.PENDING_VERIFICATION,
+            issue_label=issue.issue_label,
+        )
 
     except HTTPException:
         await db.rollback()
