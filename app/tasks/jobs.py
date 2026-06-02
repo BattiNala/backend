@@ -40,7 +40,7 @@ async def validate_issue_images(issue_repo: IssueRepository, new_issue: Issue | 
 
     if should_reject(res.result):
         reason = (
-            "Rejected by LLM" + res.result.rationale
+            "Rejected by LLM: " + res.result.rationale
             if res.result.rationale
             else "LLM verification failed"
         )
