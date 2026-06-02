@@ -47,6 +47,12 @@ async def get_issue_stats(
     """Get overall issue statistics."""
     parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
     parsed_date_to = datetime.fromisoformat(date_to) if date_to else None
+    employee_repo = EmployeeRepository(db)
+    current_employee: Employee | None = await employee_repo.get_employee_by_user_id(
+        user_id=_current_user.user_id
+    )
+    if current_employee and not department_id:
+        department_id = current_employee.department_id
 
     repo = AnalyticsRepository(db)
     stats = await repo.get_issue_statistics(
@@ -99,6 +105,12 @@ async def get_employee_analytics(
 ):
     """Get employee performance analytics."""
     repo = AnalyticsRepository(db)
+    employee_repo = EmployeeRepository(db)
+    current_employee: Employee | None = await employee_repo.get_employee_by_user_id(
+        user_id=_current_user.user_id
+    )
+    if current_employee and not department_id:
+        department_id = current_employee.department_id
     employees = await repo.get_employee_analytics(department_id=department_id)
 
     avg_resolution_rate = 0.0
@@ -128,6 +140,12 @@ async def get_issue_trend(
     _current_user: User = Depends(require_department_admin),
 ):
     """Get issue trend over time."""
+    employee_repo = EmployeeRepository(db)
+    current_employee: Employee | None = await employee_repo.get_employee_by_user_id(
+        user_id=_current_user.user_id
+    )
+    if current_employee and not department_id:
+        department_id = current_employee.department_id
     repo = AnalyticsRepository(db)
     trend = await repo.get_issue_trend(days=days, department_id=department_id)
     return IssueTrendResponse(trend=trend, total_days=len(trend))
@@ -145,6 +163,7 @@ async def get_user_stats(
     _current_user: User = Depends(require_superadmin),
 ):
     """Get user statistics."""
+
     repo = AnalyticsRepository(db)
     stats = await repo.get_user_statistics()
     return UserStatsResponse(**stats)
@@ -165,6 +184,12 @@ async def get_team_analytics(
     """Get team workload analytics."""
 
     repo = AnalyticsRepository(db)
+    employee_repo = EmployeeRepository(db)
+    current_employee: Employee | None = await employee_repo.get_employee_by_user_id(
+        user_id=_current_user.user_id
+    )
+    if current_employee and not department_id:
+        department_id = current_employee.department_id
     teams = await repo.get_team_analytics(department_id=department_id)
     return TeamAnalyticsResponse(teams=teams, total_teams=len(teams))
 
