@@ -230,7 +230,7 @@ def test_validate_issue_images_rejects_weak_match(monkeypatch):
     assert status == "rejected"
     issue_repo.reject_issue.assert_awaited_once_with(
         issue,
-        reason="Rejected by LLMImage is unrelated",
+        reason="Rejected by LLM: Image is unrelated",
         auto_reject=True,
     )
 

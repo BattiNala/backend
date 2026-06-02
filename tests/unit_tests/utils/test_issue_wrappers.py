@@ -14,6 +14,7 @@ def _build_issue(rejected_issues):
         description="Broken curb",
         status=IssueStatus.REJECTED,
         issue_priority=IssuePriority.NORMAL,
+        reporter=None,
         assignee=None,
         created_at=None,
         attachments=[SimpleNamespace(path="/tmp/photo.jpg")],
