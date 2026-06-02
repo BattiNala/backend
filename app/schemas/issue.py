@@ -166,7 +166,7 @@ class IssueReportRequest(BaseModel):
     """Schema for reporting a false issue."""
 
     issue_label: str
-    reason: str = Field(..., min_length=30)
+    reason: str = Field(..., min_length=10)
 
 
 class IssuePriorityOptionsResponse(BaseModel):
@@ -179,7 +179,7 @@ class IssueRejectRequest(BaseModel):
     """Schema for rejecting an issue."""
 
     issue_label: str
-    reason: str = Field(..., min_length=30)
+    reason: str = Field(..., min_length=10)
 
 
 class IssueRejectResponse(BaseModel):

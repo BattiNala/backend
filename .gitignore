@@ -214,3 +214,4 @@ employees_sewage.csv
 ./tests/cli_tests/add_employees.py
 dev_scripts/generate_postman_collection.py
 postman/battinala-api.postman_collection.json
+tests/cli_tests/test_hash.py

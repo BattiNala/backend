@@ -35,3 +35,12 @@ class CitizenRepository:
         await self.db.commit()
         await self.db.refresh(citizen)
         return citizen
+
+    async def update_trust_score(self, citizen_id: int, change: int) -> Citizen:
+        """Update the trust score for a citizen."""
+        citizen = await self.get_citizen_by_id(citizen_id)
+        citizen.trust_score += change
+        self.db.add(citizen)
+        await self.db.commit()
+        await self.db.refresh(citizen)
+        return citizen

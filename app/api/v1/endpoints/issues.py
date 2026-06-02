@@ -505,6 +505,7 @@ async def resolve_issue_by_staff(
     try:
         issue_repo = IssueRepository(db)
         employee_repo = EmployeeRepository(db)
+        citizen_repo = CitizenRepository(db)
         issue = await issue_repo.get_issue_by_label(payload.issue_label)
         if not issue:
             raise HTTPException(status_code=404, detail="Issue not found")
@@ -515,6 +516,8 @@ async def resolve_issue_by_staff(
 
         await issue_repo.update_issue_status(issue, IssueStatus.RESOLVED)
         await employee_repo.update_employee_status(employee, EmployeeActivityStatus.AVAILABLE)
+        await citizen_repo.update_trust_score(issue.reporter_id, change=5)
+        await db.commit()
         return {"message": "Issue status updated.", "status": IssueStatus.RESOLVED}
     except Exception as e:
         await db.rollback()
@@ -592,26 +595,40 @@ async def reject_issue(
     current_user: User = Depends(require_department_admin),
 ):
     """Reject an issue (department admin only)."""
+    try:
+        issue_repo = IssueRepository(db)
+        employee_repo = EmployeeRepository(db)
+        citizen_repo = CitizenRepository(db)
+        issue = await issue_repo.get_issue_by_label(payload.issue_label)
+        if not issue:
+            raise HTTPException(status_code=404, detail="Issue not found")
+        if issue.status != IssueStatus.PENDING_VERIFICATION:
+            raise HTTPException(
+                status_code=400,
+                detail="Only issues pending verification can be rejected.",
+            )
 
-    issue_repo = IssueRepository(db)
-    employee_repo = EmployeeRepository(db)
-    issue = await issue_repo.get_issue_by_label(payload.issue_label)
-    if not issue:
-        raise HTTPException(status_code=404, detail="Issue not found")
-    if issue.status != IssueStatus.PENDING_VERIFICATION:
-        raise HTTPException(
-            status_code=400,
-            detail="Only issues pending verification can be rejected.",
+        employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
+        if not employee or issue.issue_type != employee.department_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
+
+        await issue_repo.reject_issue(
+            issue, reason=payload.reason, rejected_by_employee_id=employee.employee_id
         )
+        await citizen_repo.update_trust_score(issue.reporter_id, change=-10)
+        await db.commit()
+        return IssueRejectResponse(message="Issue rejected.", status=IssueStatus.REJECTED)
 
-    employee = await employee_repo.get_employee_by_user_id(current_user.user_id)
-    if not employee or issue.issue_type != employee.department_id:
-        raise HTTPException(status_code=403, detail="Access forbidden: Wrong department.")
-
-    await issue_repo.reject_issue(
-        issue, reason=payload.reason, rejected_by_employee_id=employee.employee_id
-    )
-    return IssueRejectResponse(message="Issue rejected.", status=IssueStatus.REJECTED)
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error("Error rejecting issue: %s", str(e), exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while rejecting the issue.",
+        ) from e
 
 
 @issue_router.get(
