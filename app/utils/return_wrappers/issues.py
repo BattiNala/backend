@@ -19,7 +19,7 @@ def _get_rejected_reason(issue: Issue) -> str | None:
 
 def _get_reported_reason(issue: Issue) -> str | None:
     """Return the reported reason from either scalar or list relationships."""
-    reported_issue = issue.reported_issue_reports
+    reported_issue = getattr(issue, "reported_issue_reports", None)
     if not reported_issue:
         return None
     if isinstance(reported_issue, list):
